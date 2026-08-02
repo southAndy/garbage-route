@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-02T08:00:44.230Z",
+  "totals": {
+    "routes": 1135,
+    "stops": 30679,
+    "districts": 41
+  },
+  "sources": {
+    "TPE": {
+      "url": "https://data.taipei/api/dataset/6bb3304b-4f46-4bb0-8cd1-60c66dcd1cae/resource/a6e90031-7ec4-4089-afb5-361a4efe7202/download",
+      "checksum": "7bddcf4eabdac139a47ccc62da4cb8361d854bcf60082fc63127cfa2e1b941e4",
+      "etag": null,
+      "lastModified": null,
+      "routes": 486,
+      "stops": 4008,
+      "districts": 12
+    },
+    "NTP": {
+      "url": "https://data.ntpc.gov.tw/api/datasets/edc3ad26-8ae7-4916-a00b-bc6048d19bf8/csv/file",
+      "checksum": "0da3c5a1ab279f3639df68b4b4154892d13ba46685863c5998ea222faf170f9a",
+      "etag": null,
+      "lastModified": null,
+      "routes": 649,
+      "stops": 26671,
+      "districts": 29
+    }
+  }
+}

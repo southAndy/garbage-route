@@ -1,0 +1,9 @@
+node_modules
+.next
+out
+.env*
+!.env.example
+coverage
+data/*.tmp
+data/sync-status.json
+npm-debug.log*
