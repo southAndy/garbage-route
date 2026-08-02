@@ -70,4 +70,22 @@ describe("findSuspiciousCoordinates", () => {
     ])]);
     expect(findings).toEqual([]);
   });
+
+  it("保留人工加入的待確認停靠點", () => {
+    const value = route([
+      stop(1, 121.544769, 24.996981),
+      stop(2, 121.554717, 24.998029),
+      stop(3, 121.545087, 24.998644),
+    ]);
+    const findings = findSuspiciousCoordinates([value], [{
+      id: "manual-stop-2",
+      type: "isolated_stop",
+      routeId: "route-1",
+      stopId: "stop-2",
+      reason: "人工確認位置待查",
+      addedAt: "2026-08-02",
+    }]);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toMatchObject({ id: "manual-stop-2", detection: "manual", stop: { id: "stop-2" } });
+  });
 });

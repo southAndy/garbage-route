@@ -14,6 +14,15 @@ export interface CoordinateSnapshot {
   latitude: number;
 }
 
+export interface ManualCoordinateFlag {
+  id: string;
+  type: "isolated_stop";
+  routeId: string;
+  stopId: string;
+  reason: string;
+  addedAt: string;
+}
+
 interface FindingBase {
   id: string;
   severity: "high";
@@ -23,6 +32,7 @@ interface FindingBase {
   routeName: string;
   tripLabel: string | null;
   message: string;
+  detection: "automatic" | "manual";
 }
 
 export interface IsolatedStopFinding extends FindingBase {
@@ -105,7 +115,7 @@ function baseFinding(route: GarbageRoute) {
   };
 }
 
-export function findSuspiciousCoordinates(routes: GarbageRoute[]) {
+export function findSuspiciousCoordinates(routes: GarbageRoute[], manualFlags: ManualCoordinateFlag[] = []) {
   const findings: SuspiciousCoordinateFinding[] = [];
 
   for (const route of routes) {
@@ -133,6 +143,7 @@ export function findSuspiciousCoordinates(routes: GarbageRoute[]) {
         ...baseFinding(route),
         id: `${route.id}:isolated:${stop.id}`,
         type: "isolated_stop",
+        detection: "automatic",
         message: `第 ${stop.sequence} 站同時遠離前後站，但前後站彼此接近，疑似單點座標錯誤。`,
         stop: snapshot(stop),
         previousStop: snapshot(previous),
@@ -156,12 +167,45 @@ export function findSuspiciousCoordinates(routes: GarbageRoute[]) {
         ...baseFinding(route),
         id: `${route.id}:segment:${from.id}:${to.id}`,
         type: "long_segment",
+        detection: "automatic",
         message: `第 ${from.sequence}–${to.sequence} 站直線距離異常，需人工確認兩端座標。`,
         fromStop: snapshot(from),
         toStop: snapshot(to),
         metrics: { distanceKm: round(distance) },
       });
     }
+  }
+
+  for (const flag of manualFlags) {
+    if (findings.some((finding) => finding.id === flag.id || (
+      finding.type === "isolated_stop" && finding.stop.id === flag.stopId
+    ))) continue;
+    const route = routes.find((item) => item.id === flag.routeId);
+    const stopIndex = route?.stops.findIndex((stop) => stop.id === flag.stopId) ?? -1;
+    if (!route || stopIndex <= 0 || stopIndex >= route.stops.length - 1) continue;
+    const previous = route.stops[stopIndex - 1];
+    const stop = route.stops[stopIndex];
+    const next = route.stops[stopIndex + 1];
+    if (![previous, stop, next].every(isLocated)) continue;
+    const previousDistance = distanceKm(previous, stop);
+    const nextDistance = distanceKm(stop, next);
+    const bypassDistance = distanceKm(previous, next);
+    findings.push({
+      ...baseFinding(route),
+      id: flag.id,
+      type: "isolated_stop",
+      detection: "manual",
+      message: flag.reason,
+      stop: snapshot(stop),
+      previousStop: snapshot(previous),
+      nextStop: snapshot(next),
+      metrics: {
+        previousDistanceKm: round(previousDistance),
+        nextDistanceKm: round(nextDistance),
+        bypassDistanceKm: round(bypassDistance),
+        detourRatio: round((previousDistance + nextDistance) / Math.max(bypassDistance, 0.05)),
+      },
+    });
   }
 
   return findings.sort((a, b) => {
@@ -178,8 +222,9 @@ export function findSuspiciousCoordinates(routes: GarbageRoute[]) {
 export function createSuspiciousCoordinateReport(
   routes: GarbageRoute[],
   generatedAt = new Date().toISOString(),
+  manualFlags: ManualCoordinateFlag[] = [],
 ): SuspiciousCoordinateReport {
-  const findings = findSuspiciousCoordinates(routes);
+  const findings = findSuspiciousCoordinates(routes, manualFlags);
   return {
     schemaVersion: 1,
     generatedAt,

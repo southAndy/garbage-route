@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "flags": [
+    {
+      "id": "manual-tpe-wenshan-5af58bfd74-stop-9",
+      "type": "isolated_stop",
+      "routeId": "tpe-wenshan-5af58bfd74",
+      "stopId": "tpe-wenshan-5af58bfd74-stop-9",
+      "reason": "第 8、10 站相距僅約 188 公尺，但經第 9 站繞行約 1.98 公里，路線位置待確認。",
+      "addedAt": "2026-08-02"
+    }
+  ]
+}

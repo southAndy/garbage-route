@@ -1,13 +1,16 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createSuspiciousCoordinateReport } from "../lib/coordinate-quality";
+import type { ManualCoordinateFlag } from "../lib/coordinate-quality";
 import type { GarbageRoute } from "../lib/types";
+import coordinateFlagsData from "../data/coordinate-flags.json";
 
 async function main() {
   const routesTarget = resolve(process.cwd(), "data/routes.json");
   const reportTarget = resolve(process.cwd(), "data/suspicious-coordinates.json");
   const routes = JSON.parse(await readFile(routesTarget, "utf8")) as GarbageRoute[];
-  const report = createSuspiciousCoordinateReport(routes);
+  const coordinateFlags = coordinateFlagsData as { schemaVersion: 1; flags: ManualCoordinateFlag[] };
+  const report = createSuspiciousCoordinateReport(routes, undefined, coordinateFlags.flags);
   await writeFile(reportTarget, `${JSON.stringify(report, null, 2)}\n`, "utf8");
   console.log(
     `座標掃描完成：${report.summary.findings} 項可疑資料`

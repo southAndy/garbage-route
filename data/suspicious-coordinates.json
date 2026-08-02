@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-02T08:37:14.580Z",
+  "generatedAt": "2026-08-02T09:21:40.767Z",
   "rules": {
     "isolatedStopMinLegKm": 3,
     "isolatedStopMaxBypassKm": 3,
@@ -10,8 +10,8 @@
   "summary": {
     "routesScanned": 1135,
     "stopsScanned": 30679,
-    "findings": 6,
-    "isolatedStops": 5,
+    "findings": 7,
+    "isolatedStops": 6,
     "longSegments": 1
   },
   "findings": [
@@ -24,6 +24,7 @@
       "tripLabel": "第1車",
       "id": "tpe-wenshan-073012c735:isolated:tpe-wenshan-073012c735-stop-9",
       "type": "isolated_stop",
+      "detection": "automatic",
       "message": "第 9 站同時遠離前後站，但前後站彼此接近，疑似單點座標錯誤。",
       "stop": {
         "id": "tpe-wenshan-073012c735-stop-9",
@@ -65,6 +66,7 @@
       "tripLabel": "第1車",
       "id": "tpe-wenshan-073012c735:isolated:tpe-wenshan-073012c735-stop-4",
       "type": "isolated_stop",
+      "detection": "automatic",
       "message": "第 4 站同時遠離前後站，但前後站彼此接近，疑似單點座標錯誤。",
       "stop": {
         "id": "tpe-wenshan-073012c735-stop-4",
@@ -106,6 +108,7 @@
       "tripLabel": "第2車",
       "id": "tpe-wenshan-5af58bfd74:isolated:tpe-wenshan-5af58bfd74-stop-3",
       "type": "isolated_stop",
+      "detection": "automatic",
       "message": "第 3 站同時遠離前後站，但前後站彼此接近，疑似單點座標錯誤。",
       "stop": {
         "id": "tpe-wenshan-5af58bfd74-stop-3",
@@ -147,6 +150,7 @@
       "tripLabel": "第1車",
       "id": "tpe-xinyi-876621e2cb:segment:tpe-xinyi-876621e2cb-stop-1:tpe-xinyi-876621e2cb-stop-2",
       "type": "long_segment",
+      "detection": "automatic",
       "message": "第 1–2 站直線距離異常，需人工確認兩端座標。",
       "fromStop": {
         "id": "tpe-xinyi-876621e2cb-stop-1",
@@ -177,6 +181,7 @@
       "tripLabel": null,
       "id": "ntp-232012:isolated:ntp-232012-stop-7",
       "type": "isolated_stop",
+      "detection": "automatic",
       "message": "第 7 站同時遠離前後站，但前後站彼此接近，疑似單點座標錯誤。",
       "stop": {
         "id": "ntp-232012-stop-7",
@@ -218,6 +223,7 @@
       "tripLabel": null,
       "id": "ntp-232014:isolated:ntp-232014-stop-5",
       "type": "isolated_stop",
+      "detection": "automatic",
       "message": "第 5 站同時遠離前後站，但前後站彼此接近，疑似單點座標錯誤。",
       "stop": {
         "id": "ntp-232014-stop-5",
@@ -248,6 +254,48 @@
         "nextDistanceKm": 3.458,
         "bypassDistanceKm": 0.295,
         "detourRatio": 24.171
+      }
+    },
+    {
+      "severity": "high",
+      "cityCode": "TPE",
+      "district": "文山區",
+      "routeId": "tpe-wenshan-5af58bfd74",
+      "routeName": "興隆-1",
+      "tripLabel": "第2車",
+      "id": "manual-tpe-wenshan-5af58bfd74-stop-9",
+      "type": "isolated_stop",
+      "detection": "manual",
+      "message": "第 8、10 站相距僅約 188 公尺，但經第 9 站繞行約 1.98 公里，路線位置待確認。",
+      "stop": {
+        "id": "tpe-wenshan-5af58bfd74-stop-9",
+        "sequence": 9,
+        "name": "臺北市文山區景興路15號前",
+        "address": "臺北市文山區景興路15號前",
+        "longitude": 121.5547173,
+        "latitude": 24.9980293
+      },
+      "previousStop": {
+        "id": "tpe-wenshan-5af58bfd74-stop-8",
+        "sequence": 8,
+        "name": "臺北市文山區景興路47號前",
+        "address": "臺北市文山區景興路47號前",
+        "longitude": 121.544769,
+        "latitude": 24.9969806
+      },
+      "nextStop": {
+        "id": "tpe-wenshan-5af58bfd74-stop-10",
+        "sequence": 10,
+        "name": "臺北市文山區興隆路2段2號前",
+        "address": "臺北市文山區興隆路2段2號前",
+        "longitude": 121.5450872,
+        "latitude": 24.9986438
+      },
+      "metrics": {
+        "previousDistanceKm": 1.009,
+        "nextDistanceKm": 0.973,
+        "bypassDistanceKm": 0.188,
+        "detourRatio": 10.561
       }
     }
   ]
