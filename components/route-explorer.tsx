@@ -162,7 +162,12 @@ export default function RouteExplorer({
           {!route && !invalidSharedPath && <div className="map-intro"><p className="eyebrow">TAIPEI · NEW TAIPEI</p><h1>今晚的垃圾車<br />會停在哪裡？</h1><p>選擇城市、行政區與路線，查看每一站的表定時間。</p><div className="intro-steps"><span><b>1</b>選城市</span><i>→</i><span><b>2</b>選行政區</span><i>→</i><span><b>3</b>看路線</span></div></div>}
           {route && validCount === 0 && <div className="map-warning">此路線暫無可用地圖位置，請查看文字停靠點列表。</div>}
           {route && warningCount > 0 && <div className="map-warning coordinate-review-warning" role="status">此路線有 {warningCount} 項位置待確認，橘色虛線為可疑區段。</div>}
-          {route && <div className="route-badge"><span>{CITY_NAMES[route.cityCode]}・{route.district}</span><strong>{route.routeName}{route.tripLabel ? `・${route.tripLabel}` : ""}</strong><small>{route.firstArrivalTime} — {route.lastArrivalTime}・{route.stopCount} 站</small></div>}
+          {route && <div className="route-badge">
+            <span>{CITY_NAMES[route.cityCode]}・{route.district}</span>
+            <h1>{route.routeName}{route.tripLabel ? `・${route.tripLabel}` : ""}</h1>
+            <small>{route.firstArrivalTime} — {route.lastArrivalTime}・{route.stopCount} 站</small>
+            <p className="route-summary">{route.routeName}{route.tripLabel ? `・${route.tripLabel}` : ""}位於{CITY_NAMES[route.cityCode]}{route.district}，表定時間 {route.firstArrivalTime ?? "未提供"} 至 {route.lastArrivalTime ?? "未提供"}，共 {route.stopCount} 個停靠點。</p>
+          </div>}
           {selectedStop && route && <article className="stop-popup" aria-live="polite">
             <div className="popup-head"><span>第 {String(selectedStop.sequence).padStart(2, "0")} 站</span><button aria-label="關閉停靠點資訊" onClick={() => setSelectedStop(null)}>×</button></div>
             <time>{displayTime(selectedStop)}</time>

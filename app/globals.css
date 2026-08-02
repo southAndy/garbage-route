@@ -69,8 +69,9 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 .intro-steps i { color:#a5ada9; font-style:normal; }
 .route-badge { position:absolute; top:20px; left:22px; display:flex; flex-direction:column; min-width:240px; padding:15px 18px; background:rgba(255,253,248,.95); border-radius:10px; box-shadow:0 8px 25px rgba(23,60,48,.13); backdrop-filter:blur(6px); }
 .route-badge span { color:var(--green); font-size:9px; font-weight:700; letter-spacing:.08em; }
-.route-badge strong { margin-top:4px; font-family:"Noto Serif TC",serif; font-size:18px; }
+.route-badge h1 { margin:4px 0 0; font-family:"Noto Serif TC",serif; font-size:18px; }
 .route-badge small { margin-top:4px; color:var(--muted); font-size:11px; }
+.route-summary { max-width:320px; margin:8px 0 0; color:var(--muted); font-size:10px; line-height:1.55; }
 .stop-popup { position:absolute; right:22px; bottom:22px; width:330px; max-height:calc(100% - 110px); overflow:auto; padding:19px 20px 14px; background:var(--paper); border-top:5px solid var(--gold); border-radius:5px; box-shadow:var(--shadow); }
 .popup-head { display:flex; justify-content:space-between; align-items:center; color:var(--green); font-size:11px; font-weight:700; letter-spacing:.08em; }
 .popup-head button { width:28px; height:28px; color:var(--muted); background:#f0f1ed; border:0; border-radius:50%; cursor:pointer; font-size:20px; line-height:1; }
@@ -118,7 +119,7 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
   .sidebar { position:absolute; z-index:15; left:0; right:0; bottom:0; height:min(65dvh,590px); transform:translateY(calc(100% - 74px)); border:0; border-radius:18px 18px 0 0; box-shadow:0 -10px 35px rgba(23,60,48,.17); transition:transform .3s ease; }.sidebar.is-open { transform:translateY(0); }
   .sheet-handle { display:block; height:24px; flex:0 0 24px; background:transparent; border:0; cursor:pointer; }.sheet-handle span { display:block; width:40px; height:4px; margin:9px auto; background:#ccd1ce; border-radius:2px; }.filters { padding:7px 16px 12px; }.filters .step-label { display:none; }.city-tabs { margin:3px 0 8px; }.city-tabs button { height:35px; }.field-label { display:none; }.select-wrap,.search-wrap { width:calc(50% - 4px); display:inline-block; vertical-align:top; }.search-wrap { margin-left:8px; }.select-wrap select,.search-wrap input { height:40px; font-size:12px; }
   .route-results { padding-top:12px; }.route-list { padding-bottom:15px; }.route-card { padding:13px 14px; }.route-card-top strong { font-size:14px; }.route-time { font-size:15px; }.route-meta { max-width:75%; }
-  .route-badge { top:12px; left:12px; min-width:200px; padding:11px 14px; }.route-badge strong { font-size:15px; }.stop-popup { left:12px; right:12px; bottom:84px; width:auto; max-height:42%; }.map-warning { width:calc(100% - 30px); top:80px; text-align:center; }
+  .route-badge { top:12px; left:12px; min-width:200px; padding:11px 14px; }.route-badge h1 { font-size:15px; }.route-summary { display:none; }.stop-popup { left:12px; right:12px; bottom:84px; width:auto; max-height:42%; }.map-warning { width:calc(100% - 30px); top:80px; text-align:center; }
   .stops-section { padding:35px 18px 22px; }.stops-title { display:block; }.stops-title h2 { font-size:25px; }.stops-title > p { margin-top:8px; text-align:left; }.stops-track { margin-top:25px; }.stop-item { min-width:190px;width:190px; }.data-footer { grid-template-columns:1fr; gap:10px; }
 }
 
