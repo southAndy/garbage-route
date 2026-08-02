@@ -29,6 +29,14 @@ npm run sync:data
 
 每次執行仍會檢查官方檔案；若兩個來源的 checksum 都沒有變化，會直接沿用現有 JSON，不重新解析或改寫。之後可將 `npm run sync:data` 接到 cron、GitHub Actions 或部署平台排程。
 
+## 可疑座標清單
+
+```bash
+npm run audit:coordinates
+```
+
+掃描器會找出「同時遠離前後站、但前後站彼此接近」的孤立座標，以及超過 10 公里的相鄰站區段，並將待人工確認項目寫入 `data/suspicious-coordinates.json`。同步官方資料時也會更新這份報告。清單只標示可疑資料，不會自行修改官方座標；一般地圖會以黃色問號標記相關站點，並以橘色虛線保留可疑的原始連線。
+
 預設底圖使用免 API Key 的 OpenFreeMap Liberty 向量樣式，資料來自 OpenStreetMap；可透過 `NEXT_PUBLIC_MAP_STYLE_URL` 替換成 MapTiler、Stadia Maps 或自架 MapLibre 樣式。正式上線前仍應依預估流量重新確認圖磚服務條款與可用性需求。
 
 ## API

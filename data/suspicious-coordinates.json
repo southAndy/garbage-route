@@ -1,0 +1,254 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-02T08:37:14.580Z",
+  "rules": {
+    "isolatedStopMinLegKm": 3,
+    "isolatedStopMaxBypassKm": 3,
+    "isolatedStopMinDetourRatio": 4,
+    "longSegmentMinKm": 10
+  },
+  "summary": {
+    "routesScanned": 1135,
+    "stopsScanned": 30679,
+    "findings": 6,
+    "isolatedStops": 5,
+    "longSegments": 1
+  },
+  "findings": [
+    {
+      "severity": "high",
+      "cityCode": "TPE",
+      "district": "文山區",
+      "routeId": "tpe-wenshan-073012c735",
+      "routeName": "興隆-1",
+      "tripLabel": "第1車",
+      "id": "tpe-wenshan-073012c735:isolated:tpe-wenshan-073012c735-stop-9",
+      "type": "isolated_stop",
+      "message": "第 9 站同時遠離前後站，但前後站彼此接近，疑似單點座標錯誤。",
+      "stop": {
+        "id": "tpe-wenshan-073012c735-stop-9",
+        "sequence": 9,
+        "name": "臺北市文山區興隆路3段106號前",
+        "address": "臺北市文山區興隆路3段106號前",
+        "longitude": 121.5572291,
+        "latitude": 25.999389
+      },
+      "previousStop": {
+        "id": "tpe-wenshan-073012c735-stop-8",
+        "sequence": 8,
+        "name": "臺北市文山區興隆路3段52號前",
+        "address": "臺北市文山區興隆路3段52號前",
+        "longitude": 121.5558242,
+        "latitude": 25.0002513
+      },
+      "nextStop": {
+        "id": "tpe-wenshan-073012c735-stop-10",
+        "sequence": 10,
+        "name": "臺北市文山區興隆路3段156號前",
+        "address": "臺北市文山區興隆路3段156號前",
+        "longitude": 121.5583436,
+        "latitude": 24.9985506
+      },
+      "metrics": {
+        "previousDistanceKm": 111.099,
+        "nextDistanceKm": 111.288,
+        "bypassDistanceKm": 0.317,
+        "detourRatio": 702.455
+      }
+    },
+    {
+      "severity": "high",
+      "cityCode": "TPE",
+      "district": "文山區",
+      "routeId": "tpe-wenshan-073012c735",
+      "routeName": "興隆-1",
+      "tripLabel": "第1車",
+      "id": "tpe-wenshan-073012c735:isolated:tpe-wenshan-073012c735-stop-4",
+      "type": "isolated_stop",
+      "message": "第 4 站同時遠離前後站，但前後站彼此接近，疑似單點座標錯誤。",
+      "stop": {
+        "id": "tpe-wenshan-073012c735-stop-4",
+        "sequence": 4,
+        "name": "臺北市文山區景興路125號前",
+        "address": "臺北市文山區景興路125號前",
+        "longitude": 121.5547105,
+        "latitude": 24.4945516
+      },
+      "previousStop": {
+        "id": "tpe-wenshan-073012c735-stop-3",
+        "sequence": 3,
+        "name": "臺北市文山區景興路151號前",
+        "address": "臺北市文山區景興路151號前",
+        "longitude": 121.5446805,
+        "latitude": 24.9938762
+      },
+      "nextStop": {
+        "id": "tpe-wenshan-073012c735-stop-5",
+        "sequence": 5,
+        "name": "臺北市文山區景華街124號前",
+        "address": "臺北市文山區景華街124號前",
+        "longitude": 121.5468445,
+        "latitude": 24.9957043
+      },
+      "metrics": {
+        "previousDistanceKm": 55.532,
+        "nextDistanceKm": 55.731,
+        "bypassDistanceKm": 0.298,
+        "detourRatio": 373.197
+      }
+    },
+    {
+      "severity": "high",
+      "cityCode": "TPE",
+      "district": "文山區",
+      "routeId": "tpe-wenshan-5af58bfd74",
+      "routeName": "興隆-1",
+      "tripLabel": "第2車",
+      "id": "tpe-wenshan-5af58bfd74:isolated:tpe-wenshan-5af58bfd74-stop-3",
+      "type": "isolated_stop",
+      "message": "第 3 站同時遠離前後站，但前後站彼此接近，疑似單點座標錯誤。",
+      "stop": {
+        "id": "tpe-wenshan-5af58bfd74-stop-3",
+        "sequence": 3,
+        "name": "臺北市文山區辛亥路4段176號前",
+        "address": "臺北市文山區辛亥路4段176號前",
+        "longitude": 121.0561832,
+        "latitude": 25.0034911
+      },
+      "previousStop": {
+        "id": "tpe-wenshan-5af58bfd74-stop-2",
+        "sequence": 2,
+        "name": "臺北市文山區辛亥路4段132號前",
+        "address": "臺北市文山區辛亥路4段132號前",
+        "longitude": 121.5568007,
+        "latitude": 25.0045556
+      },
+      "nextStop": {
+        "id": "tpe-wenshan-5af58bfd74-stop-4",
+        "sequence": 4,
+        "name": "臺北市文山區辛亥路4段228號前",
+        "address": "臺北市文山區辛亥路4段228號前",
+        "longitude": 121.5552851,
+        "latitude": 25.0020662
+      },
+      "metrics": {
+        "previousDistanceKm": 50.449,
+        "nextDistanceKm": 50.297,
+        "bypassDistanceKm": 0.316,
+        "detourRatio": 318.666
+      }
+    },
+    {
+      "severity": "high",
+      "cityCode": "TPE",
+      "district": "信義區",
+      "routeId": "tpe-xinyi-876621e2cb",
+      "routeName": "福德-4",
+      "tripLabel": "第1車",
+      "id": "tpe-xinyi-876621e2cb:segment:tpe-xinyi-876621e2cb-stop-1:tpe-xinyi-876621e2cb-stop-2",
+      "type": "long_segment",
+      "message": "第 1–2 站直線距離異常，需人工確認兩端座標。",
+      "fromStop": {
+        "id": "tpe-xinyi-876621e2cb-stop-1",
+        "sequence": 1,
+        "name": "臺北市信義區福德街221巷189號之7(回收車收運)",
+        "address": "臺北市信義區福德街221巷189號之7(回收車收運)",
+        "longitude": 121.58572,
+        "latitude": 25.03065
+      },
+      "toStop": {
+        "id": "tpe-xinyi-876621e2cb-stop-2",
+        "sequence": 2,
+        "name": "臺北市信義區中坡南路58號(中坡南路協和工商側門)",
+        "address": "臺北市信義區中坡南路58號(中坡南路協和工商側門)",
+        "longitude": 121.35037,
+        "latitude": 25.02317
+      },
+      "metrics": {
+        "distanceKm": 23.727
+      }
+    },
+    {
+      "severity": "high",
+      "cityCode": "NTP",
+      "district": "坪林區",
+      "routeId": "ntp-232012",
+      "routeName": "粗窟線",
+      "tripLabel": null,
+      "id": "ntp-232012:isolated:ntp-232012-stop-7",
+      "type": "isolated_stop",
+      "message": "第 7 站同時遠離前後站，但前後站彼此接近，疑似單點座標錯誤。",
+      "stop": {
+        "id": "ntp-232012-stop-7",
+        "sequence": 7,
+        "name": "九芎根15號",
+        "address": "九芎根15號",
+        "longitude": 121.664394,
+        "latitude": 24.880897
+      },
+      "previousStop": {
+        "id": "ntp-232012-stop-6",
+        "sequence": 6,
+        "name": "金瓜寮23號",
+        "address": "金瓜寮23號",
+        "longitude": 121.679443,
+        "latitude": 24.910955
+      },
+      "nextStop": {
+        "id": "ntp-232012-stop-8",
+        "sequence": 8,
+        "name": "金瓜寮24-2號",
+        "address": "金瓜寮24-2號",
+        "longitude": 121.680335,
+        "latitude": 24.908429
+      },
+      "metrics": {
+        "previousDistanceKm": 3.671,
+        "nextDistanceKm": 3.458,
+        "bypassDistanceKm": 0.295,
+        "detourRatio": 24.171
+      }
+    },
+    {
+      "severity": "high",
+      "cityCode": "NTP",
+      "district": "坪林區",
+      "routeId": "ntp-232014",
+      "routeName": "粗窟線2",
+      "tripLabel": null,
+      "id": "ntp-232014:isolated:ntp-232014-stop-5",
+      "type": "isolated_stop",
+      "message": "第 5 站同時遠離前後站，但前後站彼此接近，疑似單點座標錯誤。",
+      "stop": {
+        "id": "ntp-232014-stop-5",
+        "sequence": 5,
+        "name": "九芎根15號",
+        "address": "九芎根15號",
+        "longitude": 121.664394,
+        "latitude": 24.880897
+      },
+      "previousStop": {
+        "id": "ntp-232014-stop-4",
+        "sequence": 4,
+        "name": "金瓜寮23號",
+        "address": "金瓜寮23號",
+        "longitude": 121.679443,
+        "latitude": 24.910955
+      },
+      "nextStop": {
+        "id": "ntp-232014-stop-6",
+        "sequence": 6,
+        "name": "金瓜寮24-2號",
+        "address": "金瓜寮24-2號",
+        "longitude": 121.680335,
+        "latitude": 24.908429
+      },
+      "metrics": {
+        "previousDistanceKm": 3.671,
+        "nextDistanceKm": 3.458,
+        "bypassDistanceKm": 0.295,
+        "detourRatio": 24.171
+      }
+    }
+  ]
+}

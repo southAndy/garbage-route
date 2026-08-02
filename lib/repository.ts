@@ -1,7 +1,29 @@
 import routesData from "@/data/routes.json";
-import type { CityCode, GarbageRoute, RouteSummary } from "./types";
+import suspiciousCoordinatesData from "@/data/suspicious-coordinates.json";
+import type { SuspiciousCoordinateReport } from "./coordinate-quality";
+import type { CityCode, GarbageRoute, RouteCoordinateWarning, RouteSummary } from "./types";
 
 const routes = routesData as GarbageRoute[];
+const suspiciousCoordinates = suspiciousCoordinatesData as SuspiciousCoordinateReport;
+const warningsByRoute = new Map<string, RouteCoordinateWarning[]>();
+
+for (const finding of suspiciousCoordinates.findings) {
+  const warning: RouteCoordinateWarning = {
+    id: finding.id,
+    type: finding.type,
+    severity: finding.severity,
+    message: finding.message,
+    affectedStopIds: finding.type === "isolated_stop"
+      ? [finding.stop.id]
+      : [finding.fromStop.id, finding.toStop.id],
+  };
+  warningsByRoute.set(finding.routeId, [...(warningsByRoute.get(finding.routeId) ?? []), warning]);
+}
+
+function withCoordinateWarnings(route: GarbageRoute | undefined): GarbageRoute | null {
+  if (!route) return null;
+  return { ...route, coordinateWarnings: warningsByRoute.get(route.id) ?? [] };
+}
 
 export const cities = [
   { code: "TPE" as const, name: "臺北市" },
@@ -54,11 +76,11 @@ export function findRoutes(city: CityCode, district: string, query = "") {
 }
 
 export function getRoute(id: string) {
-  return routes.find((route) => route.id === id) ?? null;
+  return withCoordinateWarnings(routes.find((route) => route.id === id));
 }
 
 export function getRouteByPath(city: string, district: string, id: string) {
-  return routes.find((route) =>
+  return withCoordinateWarnings(routes.find((route) =>
     route.id === id && route.cityCode.toLowerCase() === city.toLowerCase() && route.districtSlug === district,
-  ) ?? null;
+  ));
 }

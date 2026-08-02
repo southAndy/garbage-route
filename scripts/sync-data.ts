@@ -3,12 +3,14 @@ import { createHash } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { normalizeNewTaipei, normalizeTaipei, qualityCheck } from "../lib/etl";
+import { createSuspiciousCoordinateReport } from "../lib/coordinate-quality";
 import type { GarbageRoute } from "../lib/types";
 
 const TPE_URL = process.env.TAIPEI_GARBAGE_DATA_URL || "https://data.taipei/api/dataset/6bb3304b-4f46-4bb0-8cd1-60c66dcd1cae/resource/a6e90031-7ec4-4089-afb5-361a4efe7202/download";
 const NTP_URL = process.env.NEW_TAIPEI_GARBAGE_DATA_URL || "https://data.ntpc.gov.tw/api/datasets/edc3ad26-8ae7-4916-a00b-bc6048d19bf8/csv/file";
 const target = resolve(process.cwd(), "data/routes.json");
 const manifestTarget = resolve(process.cwd(), "data/manifest.json");
+const suspiciousCoordinatesTarget = resolve(process.cwd(), "data/suspicious-coordinates.json");
 const SCHEMA_VERSION = 1;
 
 interface SnapshotManifest {
@@ -68,6 +70,7 @@ async function main() {
   if (errors.length) throw new Error(`品質檢查未通過：\n${errors.join("\n")}`);
   const temporary = `${target}.tmp`;
   const manifestTemporary = `${manifestTarget}.tmp`;
+  const suspiciousCoordinatesTemporary = `${suspiciousCoordinatesTarget}.tmp`;
   const allRoutes = [...tpe, ...ntp];
   const sourceStats = (routes: GarbageRoute[]) => ({
     routes: routes.length,
@@ -91,8 +94,10 @@ async function main() {
   };
   await writeFile(temporary, `${JSON.stringify(allRoutes)}\n`, "utf8");
   await writeFile(manifestTemporary, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  await writeFile(suspiciousCoordinatesTemporary, `${JSON.stringify(createSuspiciousCoordinateReport(allRoutes, syncedAt), null, 2)}\n`, "utf8");
   await rename(temporary, target);
   await rename(manifestTemporary, manifestTarget);
+  await rename(suspiciousCoordinatesTemporary, suspiciousCoordinatesTarget);
   console.log(`同步完成：臺北 ${tpe.length} 條、新北 ${ntp.length} 條，共 ${tpeRows.length + ntpRows.length} 站`);
 }
 

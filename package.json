@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
-    "sync:data": "tsx scripts/sync-data.ts"
+    "sync:data": "tsx scripts/sync-data.ts",
+    "audit:coordinates": "tsx scripts/audit-coordinates.ts"
   },
   "dependencies": {
     "@maplibre/maplibre-gl-style-spec": "^23.3.0",

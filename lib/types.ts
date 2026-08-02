@@ -1,6 +1,14 @@
 export type CityCode = "TPE" | "NTP";
 export type CoordinateStatus = "valid" | "missing" | "invalid";
 
+export interface RouteCoordinateWarning {
+  id: string;
+  type: "isolated_stop" | "long_segment";
+  severity: "high";
+  message: string;
+  affectedStopIds: string[];
+}
+
 export interface CollectionSchedule {
   garbage: boolean[];
   recycling: boolean[];
@@ -40,6 +48,7 @@ export interface GarbageRoute {
   stopCount: number;
   geometry: GeoJSON.LineString | null;
   stops: GarbageStop[];
+  coordinateWarnings?: RouteCoordinateWarning[];
   source: {
     name: string;
     url: string;
