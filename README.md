@@ -2,6 +2,8 @@
 
 以 Next.js、TypeScript 與 MapLibre GL JS 實作的 MVP。介面一次顯示一條路線，路線折線代表官方停靠點順序，不代表實際道路軌跡。
 
+> 本資料為政府公布的表定資訊，並非垃圾車即時位置；實際清運狀況與座標可能不同。
+
 ## 本機執行
 
 ```bash
@@ -43,3 +45,9 @@ npm test
 npm run lint
 npm run build
 ```
+
+## 授權與資料來源
+
+本專案自行撰寫的程式碼採 [MIT License](./LICENSE) 開源。政府路線資料、OpenStreetMap 地圖資料及第三方服務維持各自的原始授權，不包含在 MIT 授權範圍內。
+
+完整顯名、來源與免責說明請參閱 [NOTICE.md](./NOTICE.md)。
