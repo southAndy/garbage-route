@@ -106,6 +106,19 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 .stop-copy small { margin-top:4px; color:var(--muted); font-size:10px; }
 .stop-item > em { position:absolute; top:4px; left:43px; padding:2px 5px; color:white; background:var(--green); border-radius:3px; font-style:normal; font-size:8px; }
 .stop-item > em.end { background:var(--red); }
+.stop-details { max-width:1350px; margin:24px auto; overflow-x:auto; border:1px solid var(--line); border-radius:10px; }
+.stop-details:focus-visible { outline:2px solid var(--green); outline-offset:3px; }
+.stop-details-table { width:100%; min-width:760px; border-collapse:collapse; text-align:left; font-size:12px; line-height:1.7; }
+.stop-details-table caption { padding:16px; text-align:left; font-size:16px; font-weight:700; }
+.stop-details-table caption span { display:block; margin-top:4px; color:var(--muted); font-size:12px; font-weight:400; }
+.stop-details-table th,.stop-details-table td { padding:14px 16px; vertical-align:top; border-top:1px solid var(--line); }
+.stop-details-table thead { background:#eef5f0; color:var(--green); }
+.stop-details-table tbody th { width:34%; font-weight:400; }
+.stop-details-table tbody tr:nth-child(even) { background:#f8f9f5; }
+.stop-details-table button { padding:0; border:0; background:none; color:var(--green); font:inherit; font-weight:700; text-align:left; text-decoration:underline; cursor:pointer; }
+.stop-details-table td span,.stop-detail-address,.stop-detail-note { display:block; }
+.stop-detail-address { margin-top:4px; }
+.stop-detail-note { margin-top:4px; color:var(--muted); }
 .data-footer { max-width:1350px; display:grid; grid-template-columns:1.2fr 1fr auto; gap:20px; align-items:center; margin:15px auto 0; padding-top:23px; color:var(--muted); border-top:1px solid var(--line); font-size:10px; }
 .data-footer > div { display:flex; flex-direction:column; gap:3px; }.data-footer strong { color:var(--ink); }.data-footer a { color:var(--green); }
 .data-footer p { margin:0; }.data-footer .stale { padding:6px 9px; color:#7b5a0f; background:#fff4d9; border-radius:5px; }

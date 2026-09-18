@@ -1,0 +1,71 @@
+name: Sync official garbage routes
+
+on:
+  schedule:
+    # 21:23 UTC = 05:23 Asia/Taipei. GitHub may delay scheduled runs.
+    - cron: "23 21 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: official-data-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    # Manual runs must also target the production/default branch.
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Check deployment configuration
+        env:
+          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$VERCEL_DEPLOY_HOOK" ]; then
+            echo "::error::Add the VERCEL_DEPLOY_HOOK repository secret before running this workflow. See README.md."
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm run sync:data
+      - run: npm test
+      - run: npm run lint
+
+      - name: Verify production build before publishing data
+        run: npm run build
+        env:
+          SITE_URL: https://garbage-route.vercel.app
+          VERCEL_ENV: production
+
+      - name: Commit the validated snapshot and check time
+        env:
+          PRODUCTION_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/routes.json data/manifest.json data/suspicious-coordinates.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(data): refresh official routes and check time"
+            # A concurrent branch update fails safely; rerun instead of overwriting it.
+            git push origin "HEAD:$PRODUCTION_BRANCH"
+          fi
+
+      - name: Trigger Vercel deployment
+        env:
+          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          curl --fail --silent --show-error --max-time 60 \
+            --request POST "$VERCEL_DEPLOY_HOOK" --output /dev/null
+          echo "Deployment requested. Check Vercel for the build result." >> "$GITHUB_STEP_SUMMARY"

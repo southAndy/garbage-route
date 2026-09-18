@@ -54,6 +54,7 @@ export interface GarbageRoute {
     url: string;
     sourceUpdatedAt: string | null;
     syncedAt: string;
+    lastCheckedAt?: string;
     stale?: boolean;
   };
 }

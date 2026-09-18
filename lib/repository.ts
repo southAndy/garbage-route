@@ -1,4 +1,5 @@
 import routesData from "@/data/routes.json";
+import manifestData from "@/data/manifest.json";
 import suspiciousCoordinatesData from "@/data/suspicious-coordinates.json";
 import type { SuspiciousCoordinateReport } from "./coordinate-quality";
 import type { CityCode, GarbageRoute, RouteCoordinateWarning, RouteSummary } from "./types";
@@ -6,6 +7,7 @@ import type { CityCode, GarbageRoute, RouteCoordinateWarning, RouteSummary } fro
 export { CITY_NAMES, cityPath, districtPath, parseCityCode, routePath } from "./paths";
 
 const routes = routesData as GarbageRoute[];
+const manifest = manifestData as { lastCheckedAt?: string };
 const suspiciousCoordinates = suspiciousCoordinatesData as SuspiciousCoordinateReport;
 const warningsByRoute = new Map<string, RouteCoordinateWarning[]>();
 
@@ -24,7 +26,11 @@ for (const finding of suspiciousCoordinates.findings) {
 
 function withCoordinateWarnings(route: GarbageRoute | undefined): GarbageRoute | null {
   if (!route) return null;
-  return { ...route, coordinateWarnings: warningsByRoute.get(route.id) ?? [] };
+  return {
+    ...route,
+    source: { ...route.source, lastCheckedAt: manifest.lastCheckedAt ?? route.source.syncedAt },
+    coordinateWarnings: warningsByRoute.get(route.id) ?? [],
+  };
 }
 
 export const cities = [

@@ -8,16 +8,12 @@ import type { CityCode, GarbageRoute, GarbageStop, RouteSummary } from "@/lib/ty
 import { suspiciousStopIds, warningForStop } from "@/lib/route-display";
 import { CITY_NAMES, cityPath, districtPath, routePath } from "@/lib/paths";
 import SearchParamQuery from "./search-param-query";
+import StopScheduleTable from "./stop-schedule-table";
+import { displayTime, scheduleText } from "@/lib/schedule-display";
 
 const RouteMap = dynamic(() => import("./route-map"), { ssr: false, loading: () => <div className="map-loading"><span className="spinner" />正在準備地圖…</div> });
-const DAY_NAMES = ["日", "一", "二", "三", "四", "五", "六"];
 
 type District = { name: string; slug: string; routeCount: number };
-
-function scheduleText(days: boolean[]) {
-  const active = days.map((enabled, index) => enabled ? DAY_NAMES[index] : null).filter(Boolean);
-  return active.length ? active.map((day) => `週${day}`).join("、") : "未提供";
-}
 
 // Taipei time assembled by hand (no Intl) so build-time HTML and the browser produce byte-identical text.
 const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
@@ -29,12 +25,6 @@ function formatSyncTime(value: string | null) {
   const local = new Date(timestamp + TAIPEI_OFFSET_MS);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${local.getUTCFullYear()}/${pad(local.getUTCMonth() + 1)}/${pad(local.getUTCDate())} ${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}`;
-}
-
-function displayTime(stop: GarbageStop, field: "arrivalTime" | "departureTime" = "arrivalTime") {
-  const value = stop[field];
-  if (!value) return "時間未提供";
-  return `${value}${stop.serviceDayOffset ? "（次日）" : ""}`;
 }
 
 export default function RouteExplorer({
@@ -213,7 +203,8 @@ export default function RouteExplorer({
             {index === 0 && <em>起點</em>}{index === route.stops.length - 1 && <em className="end">終點</em>}
           </button>)}
         </div>
-        <footer className="data-footer"><div><strong>{route.source.name}</strong><a href={route.source.url} target="_blank" rel="noreferrer">查看官方來源 ↗</a></div><div><span>官方更新 {formatSyncTime(route.source.sourceUpdatedAt)}</span><span>系統同步 {formatSyncTime(route.source.syncedAt)}</span></div>{route.source.stale && <p className="stale">目前顯示最後一次成功同步資料</p>}<p>本資料為表定時間，實際清運狀況可能不同。</p></footer>
+        <StopScheduleTable stops={route.stops} onSelectStop={chooseStop} />
+        <footer className="data-footer"><div><strong>{route.source.name}</strong><a href={route.source.url} target="_blank" rel="noreferrer">查看官方來源 ↗</a></div><div><span>官方更新 {formatSyncTime(route.source.sourceUpdatedAt)}</span><span>資料同步 {formatSyncTime(route.source.syncedAt)}</span><span>最後成功檢查 {formatSyncTime(route.source.lastCheckedAt ?? route.source.syncedAt)}</span></div>{route.source.stale && <p className="stale">目前顯示最後一次成功同步資料</p>}<p>本資料為表定時間，實際清運狀況可能不同。</p></footer>
       </section>}
       {children}
     </main>

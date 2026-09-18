@@ -13,6 +13,9 @@ export const metadata: Metadata = {
     template: "%s｜清運地圖",
   },
   description: "查詢臺北市、新北市垃圾車表定路線、停靠點與時間。",
+  verification: {
+    google: "PYGOJ56LRt3NT_ZZRbp-1rhxwByj-OQf3gjqoVPtCT4",
+  },
   robots: isIndexable ? undefined : { index: false, follow: false },
 };
 
