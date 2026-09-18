@@ -52,7 +52,7 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 .sheet-handle { display:none; }
 
 .map-stage { min-width:0; position:relative; overflow:hidden; background:#e6e7df; }
-.map-canvas,.map-loading,.map-fallback { position:absolute; inset:0; }
+.map-stage > .map-canvas,.map-loading,.map-fallback { position:absolute; inset:0; }
 .map-loading,.map-fallback { display:grid; place-content:center; text-align:center; color:var(--green); background:#e9ebe3; }
 .spinner { justify-self:center; width:25px; height:25px; margin-bottom:12px; border:3px solid #cad5cf; border-top-color:var(--green); border-radius:50%; animation:spin .8s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }

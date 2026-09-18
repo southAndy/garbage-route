@@ -25,9 +25,18 @@ function protectNumericFilters(value: JsonValue): JsonValue {
  * expressions receive a fallback that keeps incomplete features out of the layer.
  */
 export function makeMapStyleCompatible<T>(style: T): T {
-  const candidate = style as { layers?: Array<{ filter?: JsonValue }> };
+  const candidate = style as {
+    sprite?: string;
+    layers?: Array<{ id?: string; filter?: JsonValue; layout?: { "icon-image"?: JsonValue } }>;
+  };
+  const openFreeMapSprite = candidate.sprite?.startsWith("https://tiles.openfreemap.org/sprites/");
   for (const layer of candidate.layers ?? []) {
     if (layer.filter) layer.filter = protectNumericFilters(layer.filter);
+    // OpenFreeMap's POI data can name icons absent from its sprite (for example, "gate").
+    // Use an icon that is present in that sprite so the symbol can still render.
+    if (openFreeMapSprite && layer.id?.startsWith("poi_") && Array.isArray(layer.layout?.["icon-image"])) {
+      layer.layout["icon-image"] = ["coalesce", ["image", layer.layout["icon-image"]], ["image", "marker"]];
+    }
   }
   return style;
 }

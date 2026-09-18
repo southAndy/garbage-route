@@ -32,6 +32,8 @@ export default function RouteMap({ route, selectedStop, onSelectStop, onMapError
     let loadTimeout: number | undefined;
     const controller = new AbortController();
     const initialize = async () => {
+      // MapLibre's inferred worker URL is not preserved by Next's client bundlers.
+      maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
       const styleUrl = process.env.NEXT_PUBLIC_MAP_STYLE_URL || "https://tiles.openfreemap.org/styles/liberty";
       let style: string | StyleSpecification = styleUrl;
       try {

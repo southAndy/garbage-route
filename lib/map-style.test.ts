@@ -15,4 +15,18 @@ describe("makeMapStyleCompatible", () => {
     const style = { layers: [{ filter: ["==", ["get", "class"], "road"] }] };
     expect(makeMapStyleCompatible(style).layers[0].filter).toEqual(["==", ["get", "class"], "road"]);
   });
+
+  it("讓 OpenFreeMap 缺少的 POI 圖示改用通用圖示", () => {
+    const icon = ["get", "class"];
+    const style = {
+      sprite: "https://tiles.openfreemap.org/sprites/ofm_f384/ofm",
+      layers: [
+        { id: "poi_r7", layout: { "icon-image": icon } },
+        { id: "road_one_way_arrow", layout: { "icon-image": "arrow" } },
+      ],
+    };
+    makeMapStyleCompatible(style);
+    expect(style.layers[0].layout["icon-image"]).toEqual(["coalesce", ["image", icon], ["image", "marker"]]);
+    expect(style.layers[1].layout["icon-image"]).toBe("arrow");
+  });
 });
