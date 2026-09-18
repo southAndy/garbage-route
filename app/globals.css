@@ -1,8 +1,6 @@
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Noto+Serif+TC:wght@700;900&display=swap");
-
 :root { --ink:#173c30; --green:#1f6b50; --cream:#f5f0e6; --paper:#fffdf8; --gold:#f5b840; --red:#d34a32; --muted:#6f7974; --line:#d9ded8; --shadow:0 18px 45px rgba(23,60,48,.14); }
 * { box-sizing:border-box; }
-html, body { margin:0; min-height:100%; background:var(--cream); color:var(--ink); font-family:"Noto Sans TC",system-ui,sans-serif; }
+html, body { margin:0; min-height:100%; background:var(--cream); color:var(--ink); font-family:var(--font-sans),"Noto Sans TC",system-ui,sans-serif; }
 button,input,select { font:inherit; }
 button,a { -webkit-tap-highlight-color:transparent; }
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible { outline:3px solid rgba(245,184,64,.8); outline-offset:2px; }
@@ -10,9 +8,9 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible { 
 .app-shell { min-height:100vh; }
 .app-header { height:76px; padding:0 28px; display:flex; align-items:center; justify-content:space-between; background:var(--paper); border-bottom:1px solid var(--line); position:relative; z-index:20; }
 .brand { display:flex; gap:11px; align-items:center; color:var(--ink); text-decoration:none; }
-.brand-mark { width:40px; height:40px; display:grid; place-items:center; color:var(--paper); font-family:"Noto Serif TC",serif; font-size:22px; font-weight:900; background:var(--green); border-radius:50% 50% 44% 56% / 44% 56% 44% 56%; transform:rotate(-4deg); }
+.brand-mark { width:40px; height:40px; display:grid; place-items:center; color:var(--paper); font-family:var(--font-serif),"Noto Serif TC",serif; font-size:22px; font-weight:900; background:var(--green); border-radius:50% 50% 44% 56% / 44% 56% 44% 56%; transform:rotate(-4deg); }
 .brand > span:last-child { display:flex; flex-direction:column; line-height:1.15; }
-.brand strong { font-family:"Noto Serif TC",serif; font-size:20px; letter-spacing:.12em; }
+.brand strong { font-family:var(--font-serif),"Noto Serif TC",serif; font-size:20px; letter-spacing:.12em; }
 .brand small { margin-top:4px; color:var(--muted); font-size:10px; letter-spacing:.08em; }
 .header-note { color:var(--muted); font-size:13px; }
 .status-dot { display:inline-block; width:7px; height:7px; background:var(--gold); border-radius:50%; margin-right:8px; box-shadow:0 0 0 4px rgba(245,184,64,.15); }
@@ -41,7 +39,7 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 .route-card:hover { border-color:#a6b8af; transform:translateY(-1px); box-shadow:0 8px 20px rgba(23,60,48,.08); }
 .route-card.selected { background:#eef5f0; border-color:var(--green); box-shadow:inset 4px 0 var(--green); }
 .route-card-top { display:flex; justify-content:space-between; align-items:center; }
-.route-card-top strong { font-family:"Noto Serif TC",serif; font-size:16px; }
+.route-card-top strong { font-family:var(--font-serif),"Noto Serif TC",serif; font-size:16px; }
 .route-card-top i { font-style:normal; font-size:24px; font-weight:300; color:var(--green); }
 .route-time { margin-top:9px; font-size:18px; font-weight:700; letter-spacing:.03em; }
 .route-time em { margin:0 8px; font-style:normal; color:var(--gold); }
@@ -61,7 +59,7 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 .map-fallback button { justify-self:center; padding:9px 16px; color:white; background:var(--green); border:0; border-radius:8px; cursor:pointer; }
 .map-intro { position:absolute; left:7%; top:50%; width:min(440px,70%); transform:translateY(-50%); padding:34px 40px; background:rgba(255,253,248,.94); box-shadow:var(--shadow); border-radius:3px; border-left:5px solid var(--gold); backdrop-filter:blur(6px); }
 .eyebrow { margin:0 0 8px; color:var(--green); font-size:10px; font-weight:700; letter-spacing:.2em; }
-.map-intro h1 { margin:0; font-family:"Noto Serif TC",serif; font-size:clamp(32px,4vw,54px); line-height:1.28; letter-spacing:.03em; }
+.map-intro h1 { margin:0; font-family:var(--font-serif),"Noto Serif TC",serif; font-size:clamp(32px,4vw,54px); line-height:1.28; letter-spacing:.03em; }
 .map-intro > p:not(.eyebrow) { color:var(--muted); line-height:1.7; font-size:14px; }
 .intro-steps { display:flex; gap:10px; align-items:center; margin-top:22px; font-size:11px; font-weight:700; }
 .intro-steps span { display:flex; align-items:center; gap:5px; }
@@ -69,14 +67,14 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 .intro-steps i { color:#a5ada9; font-style:normal; }
 .route-badge { position:absolute; top:20px; left:22px; display:flex; flex-direction:column; min-width:240px; padding:15px 18px; background:rgba(255,253,248,.95); border-radius:10px; box-shadow:0 8px 25px rgba(23,60,48,.13); backdrop-filter:blur(6px); }
 .route-badge span { color:var(--green); font-size:9px; font-weight:700; letter-spacing:.08em; }
-.route-badge h1 { margin:4px 0 0; font-family:"Noto Serif TC",serif; font-size:18px; }
+.route-badge h1 { margin:4px 0 0; font-family:var(--font-serif),"Noto Serif TC",serif; font-size:18px; }
 .route-badge small { margin-top:4px; color:var(--muted); font-size:11px; }
 .route-summary { max-width:320px; margin:8px 0 0; color:var(--muted); font-size:10px; line-height:1.55; }
 .stop-popup { position:absolute; right:22px; bottom:22px; width:330px; max-height:calc(100% - 110px); overflow:auto; padding:19px 20px 14px; background:var(--paper); border-top:5px solid var(--gold); border-radius:5px; box-shadow:var(--shadow); }
 .popup-head { display:flex; justify-content:space-between; align-items:center; color:var(--green); font-size:11px; font-weight:700; letter-spacing:.08em; }
 .popup-head button { width:28px; height:28px; color:var(--muted); background:#f0f1ed; border:0; border-radius:50%; cursor:pointer; font-size:20px; line-height:1; }
-.stop-popup > time { display:block; margin-top:5px; color:var(--ink); font-family:"Noto Serif TC",serif; font-size:29px; font-weight:900; }
-.stop-popup h2 { margin:4px 0; font-family:"Noto Serif TC",serif; font-size:18px; }
+.stop-popup > time { display:block; margin-top:5px; color:var(--ink); font-family:var(--font-serif),"Noto Serif TC",serif; font-size:29px; font-weight:900; }
+.stop-popup h2 { margin:4px 0; font-family:var(--font-serif),"Noto Serif TC",serif; font-size:18px; }
 .stop-popup > p { margin:5px 0; color:var(--muted); font-size:11px; line-height:1.6; }
 .detail-row b { color:var(--ink); }
 .memo,.coordinate-warning { padding:7px 9px; background:#fff4d9; border-radius:6px; color:#7b5a0f !important; }
@@ -91,7 +89,7 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 
 .stops-section { padding:50px max(5vw,35px) 28px; background:var(--paper); }
 .stops-title { display:flex; justify-content:space-between; align-items:flex-end; max-width:1350px; margin:auto; }
-.stops-title h2 { margin:0; font-family:"Noto Serif TC",serif; font-size:30px; }
+.stops-title h2 { margin:0; font-family:var(--font-serif),"Noto Serif TC",serif; font-size:30px; }
 .stops-title > p { max-width:440px; margin:0; color:var(--muted); text-align:right; font-size:12px; }
 .stops-track { display:flex; max-width:1350px; margin:32px auto; padding-bottom:16px; overflow-x:auto; }
 .stop-item { width:220px; min-width:220px; position:relative; display:flex; flex-direction:column; align-items:flex-start; padding:0 22px 15px 0; text-align:left; color:var(--ink); background:transparent; border:0; cursor:pointer; }
@@ -104,14 +102,14 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 .stop-item:last-child .track-line { display:none; }
 .stop-copy { display:flex; flex-direction:column; margin-top:12px; }
 .stop-copy time { color:var(--green); font-size:18px; font-weight:700; }
-.stop-copy strong { margin-top:4px; font-family:"Noto Serif TC",serif; font-size:14px; line-height:1.5; }
+.stop-copy strong { margin-top:4px; font-family:var(--font-serif),"Noto Serif TC",serif; font-size:14px; line-height:1.5; }
 .stop-copy small { margin-top:4px; color:var(--muted); font-size:10px; }
 .stop-item > em { position:absolute; top:4px; left:43px; padding:2px 5px; color:white; background:var(--green); border-radius:3px; font-style:normal; font-size:8px; }
 .stop-item > em.end { background:var(--red); }
 .data-footer { max-width:1350px; display:grid; grid-template-columns:1.2fr 1fr auto; gap:20px; align-items:center; margin:15px auto 0; padding-top:23px; color:var(--muted); border-top:1px solid var(--line); font-size:10px; }
 .data-footer > div { display:flex; flex-direction:column; gap:3px; }.data-footer strong { color:var(--ink); }.data-footer a { color:var(--green); }
 .data-footer p { margin:0; }.data-footer .stale { padding:6px 9px; color:#7b5a0f; background:#fff4d9; border-radius:5px; }
-.standalone { max-width:600px; margin:15vh auto; padding:30px; text-align:center; }.standalone h1 { font-family:"Noto Serif TC",serif; }.primary-button { display:inline-block; margin-top:20px; padding:12px 18px; color:white; background:var(--green); border-radius:8px; text-decoration:none; }
+.standalone { max-width:600px; margin:15vh auto; padding:30px; text-align:center; }.standalone h1 { font-family:var(--font-serif),"Noto Serif TC",serif; }.primary-button { display:inline-block; margin-top:20px; padding:12px 18px; color:white; background:var(--green); border-radius:8px; text-decoration:none; }
 
 @media (max-width: 760px) {
   .app-header { height:62px; padding:0 15px; }.brand-mark { width:34px;height:34px;font-size:18px; }.brand strong { font-size:17px; }.brand small,.desktop-only { display:none; }.header-note { font-size:10px; }
@@ -133,15 +131,15 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 .breadcrumb [aria-current] { color:var(--ink); font-weight:600; }
 .hub { max-width:1100px; margin:0 auto; padding:40px max(5vw,24px) 60px; }
 .hub .breadcrumb { padding:0 0 24px; background:none; border:0; }
-.hub h1 { margin:0; font-family:"Noto Serif TC",serif; font-size:clamp(30px,4vw,46px); line-height:1.25; }
+.hub h1 { margin:0; font-family:var(--font-serif),"Noto Serif TC",serif; font-size:clamp(30px,4vw,46px); line-height:1.25; }
 .hub-lead { max-width:640px; color:var(--muted); line-height:1.7; font-size:15px; }.hub-lead a { color:var(--green); }
 .hub-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; margin:28px 0 0; padding:0; list-style:none; }
 .hub-card { display:flex; flex-direction:column; gap:4px; height:100%; padding:16px; color:var(--ink); background:var(--paper); border:1px solid var(--line); border-radius:12px; text-decoration:none; transition:transform .15s,box-shadow .15s; }
 .hub-card:hover { transform:translateY(-2px); box-shadow:var(--shadow); }
-.hub-card strong { font-family:"Noto Serif TC",serif; font-size:17px; }.hub-card span { font-size:13px; color:var(--green); font-weight:600; }.hub-card small { font-size:12px; color:var(--muted); }
+.hub-card strong { font-family:var(--font-serif),"Noto Serif TC",serif; font-size:17px; }.hub-card span { font-size:13px; color:var(--green); font-weight:600; }.hub-card small { font-size:12px; color:var(--muted); }
 .hub-note { margin-top:36px; font-size:12px; color:var(--muted); }
 .district-index, .related-routes { padding:50px max(5vw,35px) 60px; background:var(--cream); border-top:1px solid var(--line); }
-.district-index h2, .related-routes h2 { margin:0 0 20px; font-family:"Noto Serif TC",serif; font-size:26px; }
+.district-index h2, .related-routes h2 { margin:0 0 20px; font-family:var(--font-serif),"Noto Serif TC",serif; font-size:26px; }
 .district-index-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:32px; max-width:1350px; }
 .district-index h3 { margin:0 0 10px; font-size:16px; }.district-index h3 a { color:var(--ink); text-decoration:none; }.district-index h3 a:hover { color:var(--green); }
 .district-index ul, .related-routes ul { display:flex; flex-wrap:wrap; gap:8px; margin:0; padding:0; list-style:none; }

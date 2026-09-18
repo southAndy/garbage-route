@@ -1,9 +1,9 @@
 import type { MetadataRoute } from "next";
+import { siteUrl } from "@/lib/site-url";
 import routesData from "@/data/routes.json";
 import type { GarbageRoute } from "@/lib/types";
 import { cities, cityPath, districtPath, getDistricts, routePath } from "@/lib/repository";
 
-const siteUrl = (process.env.SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const routes = routesData as GarbageRoute[];
 
 export default function sitemap(): MetadataRoute.Sitemap {

@@ -7,7 +7,6 @@ import { CITY_NAMES, cityPath, districtPath, getAllRoutePaths, getRouteByPath, g
 
 type RoutePageProps = {
   params: Promise<{ city: string; district: string; routeId: string }>;
-  searchParams: Promise<{ q?: string }>;
 };
 
 export function generateStaticParams() {
@@ -48,12 +47,8 @@ export async function generateMetadata({ params }: RoutePageProps): Promise<Meta
   };
 }
 
-export default async function SharedRoutePage({
-  params,
-  searchParams,
-}: RoutePageProps) {
+export default async function SharedRoutePage({ params }: RoutePageProps) {
   const path = await params;
-  const query = await searchParams;
   const route = getRouteByPath(path.city, path.district, path.routeId);
   if (!route) notFound();
   const cityName = CITY_NAMES[route.cityCode];
@@ -63,7 +58,7 @@ export default async function SharedRoutePage({
   return (
     <RouteExplorer
       initialRoute={route}
-      initialQuery={query.q ?? ""}
+      syncQueryFromUrl
       breadcrumb={<Breadcrumb items={[{ label: "首頁", href: "/" }, { label: cityName, href: cityPath(route.cityCode) }, { label: route.district, href: districtPath(route.cityCode, route.districtSlug) }, { label: routeLabel }]} />}
     >
       {siblings.length > 0 && <section className="related-routes" aria-labelledby="related-routes-title">

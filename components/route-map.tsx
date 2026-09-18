@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import type { GeoJSONSource, Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
 import type { GarbageRoute, GarbageStop } from "@/lib/types";
 import { makeMapStyleCompatible } from "@/lib/map-style";

@@ -1,14 +1,12 @@
 import type { MetadataRoute } from "next";
+import { isIndexable, siteUrl } from "@/lib/site-url";
 
-const siteUrl = (process.env.SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: {
-      userAgent: "*",
-      allow: "/",
-      disallow: "/api/",
-    },
+    rules: isIndexable
+      ? { userAgent: "*", allow: "/", disallow: "/api/" }
+      : { userAgent: "*", disallow: "/" },
     sitemap: `${siteUrl}/sitemap.xml`,
     host: siteUrl,
   };

@@ -1,12 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { CityCode, GarbageRoute, GarbageStop, RouteSummary } from "@/lib/types";
 import { suspiciousStopIds, warningForStop } from "@/lib/route-display";
 import { CITY_NAMES, cityPath, districtPath, routePath } from "@/lib/paths";
+import SearchParamQuery from "./search-param-query";
 
 const RouteMap = dynamic(() => import("./route-map"), { ssr: false, loading: () => <div className="map-loading"><span className="spinner" />正在準備地圖…</div> });
 const DAY_NAMES = ["日", "一", "二", "三", "四", "五", "六"];
@@ -30,6 +31,7 @@ export default function RouteExplorer({
   initialDistrict = "",
   initialQuery = "",
   invalidSharedPath = false,
+  syncQueryFromUrl = false,
   breadcrumb,
   children,
 }: {
@@ -38,6 +40,7 @@ export default function RouteExplorer({
   initialDistrict?: string;
   initialQuery?: string;
   invalidSharedPath?: boolean;
+  syncQueryFromUrl?: boolean;
   breadcrumb?: ReactNode;
   children?: ReactNode;
 }) {
@@ -126,6 +129,7 @@ export default function RouteExplorer({
 
   return (
     <main className="app-shell">
+      {syncQueryFromUrl && <Suspense fallback={null}><SearchParamQuery onQuery={setQuery} /></Suspense>}
       <header className="app-header">
         <Link href="/" className="brand" aria-label="清運地圖首頁"><span className="brand-mark">清</span><span><strong>清運地圖</strong><small>雙北表定垃圾車路線</small></span></Link>
         <div className="header-note"><span className="status-dot" />非即時位置<span className="desktop-only">・依官方停靠順序繪製</span></div>
