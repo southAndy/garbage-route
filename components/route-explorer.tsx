@@ -19,13 +19,16 @@ function scheduleText(days: boolean[]) {
   return active.length ? active.map((day) => `週${day}`).join("、") : "未提供";
 }
 
-// Fixed time zone and numeric parts so build-time HTML (UTC on Vercel) matches what the browser renders.
-const syncTimeFormatter = new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+// Taipei time assembled by hand (no Intl) so build-time HTML and the browser produce byte-identical text.
+const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
 
 function formatSyncTime(value: string | null) {
   if (!value) return "未提供";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "未提供" : syncTimeFormatter.format(date);
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) return "未提供";
+  const local = new Date(timestamp + TAIPEI_OFFSET_MS);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${local.getUTCFullYear()}/${pad(local.getUTCMonth() + 1)}/${pad(local.getUTCDate())} ${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}`;
 }
 
 function displayTime(stop: GarbageStop, field: "arrivalTime" | "departureTime" = "arrivalTime") {
