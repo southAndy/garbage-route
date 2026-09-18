@@ -3,6 +3,8 @@ import suspiciousCoordinatesData from "@/data/suspicious-coordinates.json";
 import type { SuspiciousCoordinateReport } from "./coordinate-quality";
 import type { CityCode, GarbageRoute, RouteCoordinateWarning, RouteSummary } from "./types";
 
+export { CITY_NAMES, cityPath, districtPath, parseCityCode, routePath } from "./paths";
+
 const routes = routesData as GarbageRoute[];
 const suspiciousCoordinates = suspiciousCoordinatesData as SuspiciousCoordinateReport;
 const warningsByRoute = new Map<string, RouteCoordinateWarning[]>();
@@ -83,4 +85,23 @@ export function getRouteByPath(city: string, district: string, id: string) {
   return withCoordinateWarnings(routes.find((route) =>
     route.id === id && route.cityCode.toLowerCase() === city.toLowerCase() && route.districtSlug === district,
   ));
+}
+
+export function getDistrictBySlug(city: CityCode, slug: string) {
+  return getDistricts(city).find((item) => item.slug === slug) ?? null;
+}
+
+export function getRouteSummariesByDistrictSlug(city: CityCode, slug: string) {
+  return routes
+    .filter((route) => route.cityCode === city && route.districtSlug === slug)
+    .map(toSummary)
+    .sort((a, b) => a.routeName.localeCompare(b.routeName, "zh-Hant") || (a.tripLabel ?? "").localeCompare(b.tripLabel ?? "", "zh-Hant"));
+}
+
+export function getAllDistrictPaths() {
+  return cities.flatMap((city) => getDistricts(city.code).map((district) => ({ city: city.code.toLowerCase(), district: district.slug })));
+}
+
+export function getAllRoutePaths() {
+  return routes.map((route) => ({ city: route.cityCode.toLowerCase(), district: route.districtSlug, routeId: route.id }));
 }

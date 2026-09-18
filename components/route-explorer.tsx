@@ -1,14 +1,14 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { CityCode, GarbageRoute, GarbageStop, RouteSummary } from "@/lib/types";
 import { suspiciousStopIds, warningForStop } from "@/lib/route-display";
+import { CITY_NAMES, cityPath, districtPath, routePath } from "@/lib/paths";
 
 const RouteMap = dynamic(() => import("./route-map"), { ssr: false, loading: () => <div className="map-loading"><span className="spinner" />正在準備地圖…</div> });
-const CITY_NAMES: Record<CityCode, string> = { TPE: "臺北市", NTP: "新北市" };
 const DAY_NAMES = ["日", "一", "二", "三", "四", "五", "六"];
 
 type District = { name: string; slug: string; routeCount: number };
@@ -30,12 +30,16 @@ export default function RouteExplorer({
   initialDistrict = "",
   initialQuery = "",
   invalidSharedPath = false,
+  breadcrumb,
+  children,
 }: {
   initialRoute?: GarbageRoute | null;
   initialCity?: CityCode;
   initialDistrict?: string;
   initialQuery?: string;
   invalidSharedPath?: boolean;
+  breadcrumb?: ReactNode;
+  children?: ReactNode;
 }) {
   const router = useRouter();
   const [city, setCity] = useState<CityCode>(initialRoute?.cityCode ?? initialCity);
@@ -106,7 +110,7 @@ export default function RouteExplorer({
       const search = new URLSearchParams();
       if (query) search.set("q", query);
       const suffix = search.size ? `?${search}` : "";
-      router.push(`/routes/${detail.cityCode.toLowerCase()}/${detail.districtSlug}/${detail.id}${suffix}`);
+      router.push(`${routePath(detail)}${suffix}`);
     } catch {
       setError("找不到指定垃圾車路線，資料可能已更新。");
     }
@@ -126,6 +130,7 @@ export default function RouteExplorer({
         <Link href="/" className="brand" aria-label="清運地圖首頁"><span className="brand-mark">清</span><span><strong>清運地圖</strong><small>雙北表定垃圾車路線</small></span></Link>
         <div className="header-note"><span className="status-dot" />非即時位置<span className="desktop-only">・依官方停靠順序繪製</span></div>
       </header>
+      {breadcrumb}
 
       <section className="workspace">
         <aside className={`sidebar ${mobilePanelOpen ? "is-open" : ""}`} aria-label="路線查詢">
@@ -146,12 +151,12 @@ export default function RouteExplorer({
             {error && <div className="alert" role="alert">{error}</div>}
             {!loadingRoutes && routes.length === 0 ? <div className="empty-state"><span>沒有相符路線</span><p>試試其他關鍵字或行政區</p></div> : (
               <div className="route-list">
-                {routes.map((item) => <button key={item.id} className={`route-card ${route?.id === item.id ? "selected" : ""}`} onClick={() => selectRoute(item)}>
+                {routes.map((item) => <Link key={item.id} href={routePath(item)} className={`route-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); selectRoute(item); }}>
                   <span className="route-card-top"><strong>{item.routeName}{item.tripLabel ? `・${item.tripLabel}` : ""}</strong><i>›</i></span>
                   <span className="route-time">{item.firstArrivalTime ?? "--:--"}<em>—</em>{item.lastArrivalTime ?? "--:--"}</span>
                   <span className="route-meta">{item.startStopName ?? "起點未提供"} → {item.endStopName ?? "終點未提供"}</span>
                   <span className="route-count">共 {item.stopCount} 站</span>
-                </button>)}
+                </Link>)}
               </div>
             )}
           </div>
@@ -163,7 +168,7 @@ export default function RouteExplorer({
           {route && validCount === 0 && <div className="map-warning">此路線暫無可用地圖位置，請查看文字停靠點列表。</div>}
           {route && warningCount > 0 && <div className="map-warning coordinate-review-warning" role="status">此路線有 {warningCount} 項位置待確認，橘色虛線為可疑區段。</div>}
           {route && <div className="route-badge">
-            <span>{CITY_NAMES[route.cityCode]}・{route.district}</span>
+            <span><Link href={cityPath(route.cityCode)}>{CITY_NAMES[route.cityCode]}</Link>・<Link href={districtPath(route.cityCode, route.districtSlug)}>{route.district}</Link></span>
             <h1>{route.routeName}{route.tripLabel ? `・${route.tripLabel}` : ""}</h1>
             <small>{route.firstArrivalTime} — {route.lastArrivalTime}・{route.stopCount} 站</small>
             <p className="route-summary">{route.routeName}{route.tripLabel ? `・${route.tripLabel}` : ""}位於{CITY_NAMES[route.cityCode]}{route.district}，表定時間 {route.firstArrivalTime ?? "未提供"} 至 {route.lastArrivalTime ?? "未提供"}，共 {route.stopCount} 個停靠點。</p>
@@ -194,6 +199,7 @@ export default function RouteExplorer({
         </div>
         <footer className="data-footer"><div><strong>{route.source.name}</strong><a href={route.source.url} target="_blank" rel="noreferrer">查看官方來源 ↗</a></div><div><span>官方更新 {route.source.sourceUpdatedAt ? new Date(route.source.sourceUpdatedAt).toLocaleString("zh-TW") : "未提供"}</span><span>系統同步 {new Date(route.source.syncedAt).toLocaleString("zh-TW")}</span></div>{route.source.stale && <p className="stale">目前顯示最後一次成功同步資料</p>}<p>本資料為表定時間，實際清運狀況可能不同。</p></footer>
       </section>}
+      {children}
     </main>
   );
 }
