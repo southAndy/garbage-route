@@ -19,6 +19,15 @@ function scheduleText(days: boolean[]) {
   return active.length ? active.map((day) => `週${day}`).join("、") : "未提供";
 }
 
+// Fixed time zone and numeric parts so build-time HTML (UTC on Vercel) matches what the browser renders.
+const syncTimeFormatter = new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+
+function formatSyncTime(value: string | null) {
+  if (!value) return "未提供";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "未提供" : syncTimeFormatter.format(date);
+}
+
 function displayTime(stop: GarbageStop, field: "arrivalTime" | "departureTime" = "arrivalTime") {
   const value = stop[field];
   if (!value) return "時間未提供";
@@ -201,7 +210,7 @@ export default function RouteExplorer({
             {index === 0 && <em>起點</em>}{index === route.stops.length - 1 && <em className="end">終點</em>}
           </button>)}
         </div>
-        <footer className="data-footer"><div><strong>{route.source.name}</strong><a href={route.source.url} target="_blank" rel="noreferrer">查看官方來源 ↗</a></div><div><span>官方更新 {route.source.sourceUpdatedAt ? new Date(route.source.sourceUpdatedAt).toLocaleString("zh-TW") : "未提供"}</span><span>系統同步 {new Date(route.source.syncedAt).toLocaleString("zh-TW")}</span></div>{route.source.stale && <p className="stale">目前顯示最後一次成功同步資料</p>}<p>本資料為表定時間，實際清運狀況可能不同。</p></footer>
+        <footer className="data-footer"><div><strong>{route.source.name}</strong><a href={route.source.url} target="_blank" rel="noreferrer">查看官方來源 ↗</a></div><div><span>官方更新 {formatSyncTime(route.source.sourceUpdatedAt)}</span><span>系統同步 {formatSyncTime(route.source.syncedAt)}</span></div>{route.source.stale && <p className="stale">目前顯示最後一次成功同步資料</p>}<p>本資料為表定時間，實際清運狀況可能不同。</p></footer>
       </section>}
       {children}
     </main>
