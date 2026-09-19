@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import DistrictIndex from "@/components/district-index";
 import RouteExplorer from "@/components/route-explorer";
+import JsonLd from "@/components/json-ld";
+import { siteUrl } from "@/lib/site-url";
 import type { CityCode } from "@/lib/types";
 
 export const metadata: Metadata = {
@@ -17,8 +19,16 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const params = await searchParams;
   const initialCity: CityCode = params.city?.toUpperCase() === "NTP" ? "NTP" : "TPE";
   return (
-    <RouteExplorer initialCity={initialCity} initialDistrict={params.district ?? ""} initialQuery={params.q ?? ""}>
-      <DistrictIndex />
-    </RouteExplorer>
+    <>
+      <JsonLd data={{
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        name: "清運地圖",
+        url: `${siteUrl}/`,
+      }} />
+      <RouteExplorer initialCity={initialCity} initialDistrict={params.district ?? ""} initialQuery={params.q ?? ""}>
+        <DistrictIndex />
+      </RouteExplorer>
+    </>
   );
 }
