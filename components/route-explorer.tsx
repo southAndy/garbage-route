@@ -9,6 +9,7 @@ import { suspiciousStopIds, warningForStop } from "@/lib/route-display";
 import { CITY_NAMES, cityPath, districtPath, routePath } from "@/lib/paths";
 import SearchParamQuery from "./search-param-query";
 import StopScheduleTable from "./stop-schedule-table";
+import SiteHeader from "./site-header";
 import { displayTime, scheduleText } from "@/lib/schedule-display";
 
 const RouteMap = dynamic(() => import("./route-map"), { ssr: false, loading: () => <div className="map-loading"><span className="spinner" />正在準備地圖…</div> });
@@ -132,10 +133,7 @@ export default function RouteExplorer({
   return (
     <main className="app-shell">
       {syncQueryFromUrl && <Suspense fallback={null}><SearchParamQuery onQuery={setQuery} /></Suspense>}
-      <header className="app-header">
-        <Link href="/" className="brand" aria-label="清運地圖首頁"><span className="brand-mark">清</span><span><strong>清運地圖</strong><small>雙北表定垃圾車路線</small></span></Link>
-        <div className="header-note"><span className="status-dot" />非即時位置<span className="desktop-only">・依官方停靠順序繪製</span></div>
-      </header>
+      <SiteHeader />
       {breadcrumb}
 
       <section className="workspace">
