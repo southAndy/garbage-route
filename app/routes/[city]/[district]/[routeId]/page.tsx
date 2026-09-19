@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import Breadcrumb from "@/components/breadcrumb";
 import RouteExplorer from "@/components/route-explorer";
+import { socialMetadata } from "@/lib/social-metadata";
 import { CITY_NAMES, cityPath, districtPath, getAllRoutePaths, getRouteByPath, getRouteSummariesByDistrictSlug, routePath } from "@/lib/repository";
 
 type RoutePageProps = {
@@ -37,13 +38,7 @@ export async function generateMetadata({ params }: RoutePageProps): Promise<Meta
     title,
     description,
     alternates: { canonical },
-    openGraph: {
-      type: "website",
-      locale: "zh_TW",
-      url: canonical,
-      title: `${title}｜清運地圖`,
-      description,
-    },
+    ...socialMetadata(`${title}｜清運地圖`, description, canonical),
   };
 }
 

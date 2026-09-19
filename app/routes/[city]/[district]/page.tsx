@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Breadcrumb from "@/components/breadcrumb";
 import SiteHeader from "@/components/site-header";
+import { socialMetadata } from "@/lib/social-metadata";
 import { CITY_NAMES, cityPath, districtPath, getAllDistrictPaths, getDistrictBySlug, getRouteSummariesByDistrictSlug, parseCityCode, routePath } from "@/lib/repository";
 
 type DistrictPageProps = { params: Promise<{ city: string; district: string }> };
@@ -19,7 +20,7 @@ export async function generateMetadata({ params }: DistrictPageProps): Promise<M
   const canonical = districtPath(city, district.slug);
   const title = `${CITY_NAMES[city]}${district.name}垃圾車路線與時間一覽`;
   const description = `${CITY_NAMES[city]}${district.name}共 ${district.routeCount} 條垃圾車表定路線；查看每條路線的起訖站、清運時間與完整停靠點。`;
-  return { title, description, alternates: { canonical }, openGraph: { type: "website", locale: "zh_TW", url: canonical, title: `${title}｜清運地圖`, description } };
+  return { title, description, alternates: { canonical }, ...socialMetadata(`${title}｜清運地圖`, description, canonical) };
 }
 
 export default async function DistrictPage({ params }: DistrictPageProps) {
