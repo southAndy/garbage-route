@@ -159,8 +159,10 @@ export default function RouteExplorer({
                 {routes.map((item) => <Link key={item.id} href={routePath(item)} className={`route-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); selectRoute(item); }}>
                   <span className="route-card-top"><strong>{item.routeName}{item.tripLabel ? `・${item.tripLabel}` : ""}</strong><i>›</i></span>
                   <span className="route-time">{item.firstArrivalTime ?? "--:--"}<em>—</em>{item.lastArrivalTime ?? "--:--"}</span>
-                  <span className="route-meta">{item.startStopName ?? "起點未提供"} → {item.endStopName ?? "終點未提供"}</span>
-                  <span className="route-count">共 {item.stopCount} 站</span>
+                  <span className="route-card-bottom">
+                    <span className="route-meta">{item.startStopName ?? "起點未提供"} → {item.endStopName ?? "終點未提供"}</span>
+                    <span className="route-count">共 {item.stopCount} 站</span>
+                  </span>
                 </Link>)}
               </div>
             )}
