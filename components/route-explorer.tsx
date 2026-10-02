@@ -60,7 +60,8 @@ export default function RouteExplorer({
   const [loadingRoutes, setLoadingRoutes] = useState(false);
   const [error, setError] = useState(invalidSharedPath ? "分享的路線已失效，請重新選擇路線。" : "");
   const [mapFailed, setMapFailed] = useState(false);
-  const [mobilePanelOpen, setMobilePanelOpen] = useState(true);
+  // Once a route is chosen the mobile sheet collapses so the map and stop popup stay visible.
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(!initialRoute);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query), 300);
@@ -113,7 +114,7 @@ export default function RouteExplorer({
       const detail = result.data as GarbageRoute;
       setRoute(detail);
       setSelectedStop(detail.stops[0] ?? null);
-      setMobilePanelOpen(true);
+      setMobilePanelOpen(false);
       const search = new URLSearchParams();
       if (query) search.set("q", query);
       const suffix = search.size ? `?${search}` : "";

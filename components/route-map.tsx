@@ -16,6 +16,18 @@ interface Props {
 }
 
 const TWIN_CITY_BOUNDS: [[number, number], [number, number]] = [[121.30, 24.82], [121.72, 25.22]];
+const SELECTED_STOP_RADIUS = 19;
+
+// The stop popup overlays the map; when it covers the map centre, aim the selected stop at the gap above it.
+function selectedStopOffset(mapElement: HTMLElement): [number, number] {
+  const stage = mapElement.getBoundingClientRect();
+  const popup = mapElement.parentElement?.querySelector(".stop-popup")?.getBoundingClientRect();
+  const centerX = stage.left + stage.width / 2;
+  const centerY = stage.top + stage.height / 2;
+  if (!popup || popup.left > centerX || popup.right < centerX || popup.top > centerY + SELECTED_STOP_RADIUS) return [0, 0];
+  const badge = mapElement.parentElement?.querySelector(".route-badge")?.getBoundingClientRect();
+  return [0, ((badge?.bottom ?? stage.top) + popup.top) / 2 - centerY];
+}
 
 export default function RouteMap({ route, selectedStop, onSelectStop, onMapError }: Props) {
   const container = useRef<HTMLDivElement>(null);
@@ -161,7 +173,7 @@ export default function RouteMap({ route, selectedStop, onSelectStop, onMapError
     };
     (map.getSource("selected-stop") as GeoJSONSource).setData(featureCollection);
     if (selectedStop?.coordinateStatus === "valid") {
-      map.easeTo({ center: [selectedStop.longitude!, selectedStop.latitude!], zoom: Math.max(map.getZoom(), 15), duration: 550 });
+      map.easeTo({ center: [selectedStop.longitude!, selectedStop.latitude!], zoom: Math.max(map.getZoom(), 15), offset: selectedStopOffset(map.getContainer()), duration: 550 });
     }
   }, [ready, selectedStop]);
 
