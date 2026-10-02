@@ -10,6 +10,7 @@ import { CITY_NAMES, cityPath, districtPath, routePath } from "@/lib/paths";
 import SearchParamQuery from "./search-param-query";
 import StopScheduleTable from "./stop-schedule-table";
 import SiteHeader from "./site-header";
+import FeedbackButton from "./feedback-button";
 import { displayTime, scheduleText } from "@/lib/schedule-display";
 
 const RouteMap = dynamic(() => import("./route-map"), { ssr: false, loading: () => <div className="map-loading"><span className="spinner" />正在準備地圖…</div> });
@@ -153,7 +154,7 @@ export default function RouteExplorer({
           <div className="route-results">
             <div className="results-heading"><div className="step-label"><span>02</span> 選擇路線</div><small>{loadingRoutes ? "查詢中…" : `${routes.length} 條結果`}</small></div>
             {error && <div className="alert" role="alert">{error}</div>}
-            {!loadingRoutes && routes.length === 0 ? <div className="empty-state"><span>沒有相符路線</span><p>試試其他關鍵字或行政區</p></div> : (
+            {!loadingRoutes && routes.length === 0 ? <div className="empty-state"><span>沒有相符路線</span><p>試試其他關鍵字或行政區</p>{district && !error && <FeedbackButton label="找不到要找的地點？告訴我們" context={{ entry: "empty_search", city, district, query: debouncedQuery }} summary={`${CITY_NAMES[city]}・${district}${debouncedQuery ? `・搜尋：${debouncedQuery}` : ""}`} />}</div> : (
               <div className="route-list">
                 {routes.map((item) => <Link key={item.id} href={routePath(item)} className={`route-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); selectRoute(item); }}>
                   <span className="route-card-top"><strong>{item.routeName}{item.tripLabel ? `・${item.tripLabel}` : ""}</strong><i>›</i></span>
@@ -187,6 +188,7 @@ export default function RouteExplorer({
             {selectedStop.schedule && <div className="schedule"><span>一般垃圾 <b>{scheduleText(selectedStop.schedule.garbage)}</b></span><span>資源回收 <b>{scheduleText(selectedStop.schedule.recycling)}</b></span><span>廚餘 <b>{scheduleText(selectedStop.schedule.foodScraps)}</b></span></div>}
             {selectedStop.coordinateStatus !== "valid" && <p className="coordinate-warning">此站座標無法定位</p>}
             {selectedWarning && <p className="coordinate-warning">官方座標可能有誤；橘色虛線為依原始座標繪製的待確認區段，請以地址文字為準。</p>}
+            <FeedbackButton label="回報此站資訊" context={{ entry: "stop", city: route.cityCode, district: route.district, route_id: route.id, stop_id: selectedStop.id, source_synced_at: route.source.syncedAt }} summary={`${CITY_NAMES[route.cityCode]}・${route.district}・${route.routeName}・第 ${selectedStop.sequence} 站 ${selectedStop.name}`} />
             <div className="popup-nav"><button disabled={selectedIndex <= 0} onClick={() => setSelectedStop(route.stops[selectedIndex - 1])}>← 上一站</button><span>{selectedIndex + 1} / {route.stopCount}</span><button disabled={selectedIndex >= route.stops.length - 1} onClick={() => setSelectedStop(route.stops[selectedIndex + 1])}>下一站 →</button></div>
           </article>}
         </section>
