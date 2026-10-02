@@ -15,7 +15,7 @@ describe("ETL", () => {
     expect(routes.find((route) => route.tripLabel === "第1車")?.stops.map((stop) => stop.name)).toEqual(["前站","次日站"]);
   });
   it("新北依 rank 排序並保留無效座標", () => {
-    const rows = [
+    const rows: Parameters<typeof normalizeNewTaipei>[0] = [
       { city:"新店區", lineid:"7", linename:"測試線", rank:"2", name:"第二站", longitude:"", latitude:"", time:"18:20" },
       { city:"新店區", lineid:"7", linename:"測試線", rank:"1", name:"第一站", longitude:"121.5", latitude:"25", time:"18:10", garbagemonday:"Y" },
     ];
