@@ -43,6 +43,13 @@ export default function RouteMap({ route, selectedStop, onSelectStop, onMapError
     let map: MapLibreMap | null = null;
     let loadTimeout: number | undefined;
     const controller = new AbortController();
+    const mobileViewport = window.matchMedia("(max-width: 760px)");
+    const updateGestures = () => {
+      if (!map) return;
+      if (mobileViewport.matches) map.cooperativeGestures.enable();
+      else map.cooperativeGestures.disable();
+    };
+    mobileViewport.addEventListener("change", updateGestures);
     const initialize = async () => {
       // MapLibre's inferred worker URL is not preserved by Next's client bundlers.
       maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
@@ -63,6 +70,12 @@ export default function RouteMap({ route, selectedStop, onSelectStop, onMapError
         bounds: TWIN_CITY_BOUNDS,
         fitBoundsOptions: { padding: 36 },
         attributionControl: false,
+        cooperativeGestures: mobileViewport.matches,
+        locale: {
+          "CooperativeGesturesHandler.MobileHelpText": "使用雙指移動地圖，單指滑動頁面",
+          "CooperativeGesturesHandler.WindowsHelpText": "按住 Ctrl 並滾動以縮放地圖",
+          "CooperativeGesturesHandler.MacHelpText": "按住 ⌘ 並滾動以縮放地圖",
+        },
       });
       loadTimeout = window.setTimeout(() => onMapError(), 15_000);
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
@@ -81,6 +94,7 @@ export default function RouteMap({ route, selectedStop, onSelectStop, onMapError
     return () => {
       cancelled = true;
       controller.abort();
+      mobileViewport.removeEventListener("change", updateGestures);
       if (loadTimeout) window.clearTimeout(loadTimeout);
       map?.remove();
       mapRef.current = null;
