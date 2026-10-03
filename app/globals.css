@@ -127,11 +127,12 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 
 @media (max-width: 760px) {
   .app-header { height:62px; padding:0 15px; }.brand-mark { width:34px;height:34px; }.brand strong { font-size:17px; }.brand small,.desktop-only { display:none; }.header-note { font-size:10px; }
-  .workspace { display:block; height:calc(100dvh - 62px); min-height:520px; position:relative; }.map-stage { position:absolute; inset:0; }.map-intro { left:16px; top:24px; width:calc(100% - 32px); transform:none; padding:24px 25px; }.map-intro h1 { font-size:32px; }.intro-steps { flex-wrap:wrap; }
-  .sidebar { position:absolute; z-index:15; left:0; right:0; bottom:0; height:min(65dvh,590px); transform:translateY(calc(100% - 74px)); border:0; border-radius:18px 18px 0 0; box-shadow:0 -10px 35px rgba(23,60,48,.17); transition:transform .3s ease; }.sidebar.is-open { transform:translateY(0); }
+  .workspace { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr) 74px; height:calc(100dvh - 62px); min-height:520px; position:relative; }.map-stage { position:relative; inset:auto; grid-row:1; min-height:0; }.map-intro { left:16px; top:24px; width:calc(100% - 32px); transform:none; padding:24px 25px; }.map-intro h1 { font-size:32px; }.intro-steps { flex-wrap:wrap; }
+  .sidebar { position:relative; grid-row:2; z-index:15; height:74px; border:0; border-top:1px solid var(--line); }
+  .sidebar .search-panel-content { position:absolute; bottom:100%; left:0; right:0; height:min(55dvh,calc(100dvh - 180px)); max-height:calc(100dvh - 180px); background:var(--paper); border-radius:18px 18px 0 0; box-shadow:0 -10px 35px rgba(23,60,48,.17); overflow:hidden; }
   .sheet-handle { display:block; height:24px; flex:0 0 24px; background:transparent; border:0; cursor:pointer; }.sheet-handle span { display:block; width:40px; height:4px; margin:9px auto; background:#ccd1ce; border-radius:2px; }.filters { padding:7px 16px 12px; }.filters .step-label { display:none; }.city-tabs { margin:3px 0 8px; }.city-tabs button { height:35px; }.field-label { display:none; }.select-wrap,.search-wrap { width:calc(50% - 4px); display:inline-block; vertical-align:top; }.search-wrap { margin-left:8px; }.select-wrap select,.search-wrap input { height:40px; font-size:12px; }
   .route-results { padding-top:12px; }.route-list { padding-bottom:15px; }.route-card { padding:13px 14px; }.route-card-top strong { font-size:14px; }.route-time { font-size:15px; }
-  .route-badge { top:12px; left:12px; min-width:200px; padding:11px 14px; }.route-badge h1 { font-size:15px; }.route-summary { display:none; }.stop-popup { left:12px; right:12px; bottom:84px; width:auto; max-height:calc(100% - 190px); }.map-warning { width:calc(100% - 30px); top:80px; text-align:center; }
+  .route-badge { top:12px; left:12px; min-width:200px; padding:11px 14px; }.route-badge h1 { font-size:15px; }.route-summary { display:none; }.stop-popup { left:12px; right:12px; bottom:12px; width:auto; max-height:calc(100% - 190px); }.map-warning { width:calc(100% - 30px); top:80px; text-align:center; }
   .stops-section { padding:35px 18px 22px; }.stops-title { display:block; }.stops-title h2 { font-size:25px; }.stops-title > p { margin-top:8px; text-align:left; }.stops-track { margin-top:25px; }.stop-item { min-width:190px;width:190px; }.data-footer { grid-template-columns:1fr; gap:10px; }
 }
 
@@ -184,12 +185,20 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 }
 
 /* Route landing page: clear shortcuts between the schedule and map. */
-.view-stops-button:focus-visible { outline:3px solid var(--gold); outline-offset:3px; }
+.search-panel-content { display:flex; flex:1; flex-direction:column; min-height:0; }
+.search-panel-content[hidden] { display:none; }
 .view-stops-button { display:block; margin-top:12px; padding:11px 14px; border-radius:8px; background:var(--green); color:white; text-align:center; text-decoration:none; font-size:14px; font-weight:700; }
+.view-stops-button:focus-visible,.sheet-handle:focus-visible { outline:3px solid var(--gold); outline-offset:3px; }
 .stop-map-link { margin-top:8px; color:var(--green); font-size:12px; text-decoration:underline; }
 .stops-section { scroll-margin-top:16px; }
 .map-stage:focus-visible,.stops-section:focus-visible { outline:3px solid var(--green); outline-offset:-3px; }
 @media (max-width:760px) {
+  .sheet-handle { height:74px; flex-basis:74px; padding:8px 16px 12px; color:var(--ink); }
+  .sheet-handle .sheet-grip { width:40px; height:4px; margin:0 auto 12px; background:#ccd1ce; border-radius:2px; }
+  .sheet-handle .sheet-label { display:flex; width:auto; height:auto; margin:0; background:none; border-radius:0; align-items:center; gap:12px; font-size:14px; }
+  .sheet-handle .sheet-label span { width:auto; height:auto; margin:0; background:none; border-radius:0; color:var(--green); }
+  .sheet-label > span:last-child { margin-left:auto; }
+  .sidebar:not(.is-open) .search-panel-content { display:none; }
   .route-badge { min-width:0; max-width:calc(100% - 64px); }
   .stop-popup { max-height:calc(100% - 240px); }
   .view-stops-button { margin-top:8px; }
@@ -227,7 +236,18 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
   .mobile-popup-feedback > .feedback-button:hover { color:var(--green); }
 }
 
+.route-search-shortcut { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; margin-top:8px; }
+.route-search-shortcut > span { font-size:12px; color:var(--muted); letter-spacing:normal; font-weight:400; }
+.route-search-shortcut > button { min-height:44px; padding:6px 0; border:0; background:transparent; color:var(--green); font-size:13px; font-weight:600; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+.related-routes-disclosure > summary { width:fit-content; min-height:44px; padding:12px 0; color:var(--green); font-weight:600; cursor:pointer; }
+.related-routes-disclosure[open] > summary { margin-bottom:12px; }
+.route-search-shortcut > button:focus-visible,.related-routes-disclosure > summary:focus-visible { outline:2px solid var(--green); outline-offset:3px; }
 @media (max-width:760px) {
+  .filters .route-search-label { display:block; margin-top:10px; }
+  .filters .search-wrap { display:block; width:100%; margin-left:0; }
+  .sidebar .search-panel-content { height:min(65dvh,calc(100dvh - 180px)); }
+  .route-search-shortcut { margin-top:4px; }
+  .stop-popup { max-height:calc(100% - 290px); }
 }
 
 @media (max-width:760px) {

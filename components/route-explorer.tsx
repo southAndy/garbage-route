@@ -1,7 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { CityCode, GarbageRoute, GarbageStop, RouteSummary } from "@/lib/types";
@@ -14,6 +15,15 @@ import FeedbackButton from "./feedback-button";
 import { displayTime, scheduleText } from "@/lib/schedule-display";
 
 const RouteMap = dynamic(() => import("./route-map"), { ssr: false, loading: () => <div className="map-loading"><span className="spinner" />正在準備地圖…</div> });
+
+const mobileQuery = "(max-width: 760px)";
+function subscribeToViewport(onChange: () => void) {
+  const media = window.matchMedia(mobileQuery);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+function getMobileSnapshot() { return window.matchMedia(mobileQuery).matches; }
+function getServerMobileSnapshot() { return false; }
 
 type District = { name: string; slug: string; routeCount: number };
 
@@ -49,7 +59,10 @@ export default function RouteExplorer({
   children?: ReactNode;
 }) {
   const router = useRouter();
+  const isMobile = useSyncExternalStore(subscribeToViewport, getMobileSnapshot, getServerMobileSnapshot);
   const mapStageRef = useRef<HTMLElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
   const [city, setCity] = useState<CityCode>(initialRoute?.cityCode ?? initialCity);
   const [districts, setDistricts] = useState<District[]>([]);
   const [district, setDistrict] = useState(initialRoute?.district ?? initialDistrict);
@@ -64,6 +77,19 @@ export default function RouteExplorer({
   const [mapFailed, setMapFailed] = useState(false);
   // Once a route is chosen the mobile sheet collapses so the map and stop popup stay visible.
   const [mobilePanelOpen, setMobilePanelOpen] = useState(!initialRoute);
+
+  useEffect(() => {
+    if (!isMobile || !mobilePanelOpen) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element) || sidebarRef.current?.contains(target)) return;
+      // Native modal dialogs render outside the sidebar visually; let their controls work.
+      if (target.closest("dialog[open]")) return;
+      setMobilePanelOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [isMobile, mobilePanelOpen]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query), 300);
@@ -139,6 +165,13 @@ export default function RouteExplorer({
     mapStageRef.current?.focus({ preventScroll: true });
     mapStageRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
   }, []);
+  const openRouteSearch = () => {
+    // Mount the mobile input before focusing it, within the user's click.
+    flushSync(() => setMobilePanelOpen(true));
+    searchInputRef.current?.focus({ preventScroll: true });
+    searchInputRef.current?.scrollIntoView({ block: "nearest", behavior: "auto" });
+    searchInputRef.current?.select();
+  };
   const handleMapError = useCallback(() => setMapFailed(true), []);
   const validCount = useMemo(() => route?.stops.filter((stop) => stop.coordinateStatus === "valid").length ?? 0, [route]);
   const suspiciousIds = useMemo(() => suspiciousStopIds(route), [route]);
@@ -152,8 +185,13 @@ export default function RouteExplorer({
       {breadcrumb}
 
       <section className="workspace">
-        <aside className={`sidebar ${mobilePanelOpen ? "is-open" : ""}`} aria-label="路線查詢">
-          <button className="sheet-handle" aria-label={mobilePanelOpen ? "收合路線面板" : "展開路線面板"} onClick={() => setMobilePanelOpen((open) => !open)}><span /></button>
+        <aside ref={sidebarRef} className={`sidebar ${mobilePanelOpen ? "is-open" : ""}`} aria-label="路線查詢">
+          <button className="sheet-handle" aria-expanded={mobilePanelOpen} aria-controls="route-search-panel" onClick={() => setMobilePanelOpen((open) => !open)}>
+            <span className="sheet-grip" aria-hidden="true" />
+            <span className="sheet-label"><strong>{district || CITY_NAMES[city]}</strong><span>{mobilePanelOpen ? "收合路線搜尋" : "搜尋其他路線"}</span><span aria-hidden="true">{mobilePanelOpen ? "⌄" : "⌃"}</span></span>
+          </button>
+          <div id="route-search-panel" className="search-panel-content" hidden={isMobile && !mobilePanelOpen}>
+          {(!isMobile || mobilePanelOpen) && <>
           <div className="filters">
             <div className="step-label"><span>01</span> 選擇查詢範圍</div>
             <div className="city-tabs" aria-label="城市">
@@ -161,8 +199,8 @@ export default function RouteExplorer({
             </div>
             <label className="field-label" htmlFor="district">行政區</label>
             <div className="select-wrap"><select id="district" value={district} onChange={(event) => selectDistrict(event.target.value)}>{districts.map((item) => <option value={item.name} key={item.name}>{item.name}（{item.routeCount} 條）</option>)}</select></div>
-            <label className="field-label" htmlFor="route-search">搜尋路線或停靠點</label>
-            <div className="search-wrap"><span aria-hidden="true">⌕</span><input id="route-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="例如：天母、安康路" /></div>
+            <label className="field-label route-search-label" htmlFor="route-search">搜尋{district || CITY_NAMES[city]}的路名或停靠點</label>
+            <div className="search-wrap"><span aria-hidden="true">⌕</span><input ref={searchInputRef} id="route-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={district === "士林區" ? "例如：延平北路、社子" : "輸入路名、地點或路線名稱"} /></div>
           </div>
 
           <div className="route-results">
@@ -181,6 +219,8 @@ export default function RouteExplorer({
               </div>
             )}
           </div>
+          </>}
+          </div>
         </aside>
 
         <section className="map-stage" ref={mapStageRef} tabIndex={-1} aria-label="路線地圖與所選停靠點">
@@ -194,6 +234,7 @@ export default function RouteExplorer({
             <small>全線表定 {route.firstArrivalTime ?? "--:--"} — {route.lastArrivalTime ?? "--:--"}・{route.stopCount} 站</small>
             <p className="route-summary">{route.routeName}{route.tripLabel ? `・${route.tripLabel}` : ""}位於{CITY_NAMES[route.cityCode]}{route.district}，表定時間 {route.firstArrivalTime ?? "未提供"} 至 {route.lastArrivalTime ?? "未提供"}，共 {route.stopCount} 個停靠點。</p>
             <a className="view-stops-button" href="#route-stops">查看全部站點與時間 ↓</a>
+            <div className="route-search-shortcut"><span>不是你要找的路線？</span><button type="button" onClick={openRouteSearch} aria-controls="route-search-panel">搜尋其他地點</button></div>
           </div>}
           {selectedStop && route && <article className={`stop-popup ${mobileStopOpen ? "mobile-stop-open" : ""}`} aria-live="polite">
             <div className="popup-head"><span>第 {String(selectedStop.sequence).padStart(2, "0")} 站・表定抵達</span><button aria-label="關閉停靠點資訊" onClick={() => setSelectedStop(null)}>×</button></div>

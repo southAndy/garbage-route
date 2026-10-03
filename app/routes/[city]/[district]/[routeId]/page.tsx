@@ -59,9 +59,12 @@ export default async function SharedRoutePage({ params }: RoutePageProps) {
       {siblings.length > 0 && <section className="related-routes" aria-labelledby="related-routes-title">
         <p className="eyebrow">MORE IN {route.district}</p>
         <h2 id="related-routes-title">{cityName}{route.district}其他垃圾車路線</h2>
+        <details className="related-routes-disclosure">
+          <summary>展開{route.district}其他路線（{siblings.length} 條）</summary>
         <ul>
           {siblings.map((item) => <li key={item.id}><Link href={routePath(item)}>{item.routeName}{item.tripLabel ? `・${item.tripLabel}` : ""}<small>{item.firstArrivalTime ?? "--:--"} — {item.lastArrivalTime ?? "--:--"}</small></Link></li>)}
         </ul>
+        </details>
         <p><Link href={districtPath(route.cityCode, route.districtSlug)}>查看{route.district}全部路線 →</Link></p>
       </section>}
     </RouteExplorer>
