@@ -20,7 +20,7 @@ export default function StopScheduleTable({ stops, onSelectStop }: {
           <tr key={stop.id}>
             <th scope="row">
               <button type="button" onClick={() => onSelectStop(stop)} aria-label={`查看第 ${stop.sequence} 站 ${stop.name} 的地圖位置`}>
-                {stop.sequence}. {stop.name}
+                {stop.sequence}. {stop.name}<span className="stop-map-link">在地圖查看 ↗</span>
               </button>
               <span className="stop-detail-address">{stop.address || "地址未提供"}{stop.village ? `・${stop.village}` : ""}</span>
               {stop.memo && <span className="stop-detail-note">{stop.memo}</span>}
