@@ -9,6 +9,7 @@ import type { CityCode, GarbageRoute, GarbageStop, RouteSummary } from "@/lib/ty
 import { suspiciousStopIds, warningForStop } from "@/lib/route-display";
 import { CITY_NAMES, cityPath, districtPath, routePath } from "@/lib/paths";
 import SearchParamQuery from "./search-param-query";
+import StopOutcomeFeedback from "./stop-outcome-feedback";
 import StopScheduleTable from "./stop-schedule-table";
 import SiteHeader from "./site-header";
 import FeedbackButton from "./feedback-button";
@@ -297,6 +298,7 @@ export default function RouteExplorer({
               <button type="button" onClick={() => viewStopOnMap(stop)}>在地圖查看 ↗</button>
               <FeedbackButton label="回報此站資訊" context={{ entry: "stop", city: route.cityCode, district: route.district, route_id: route.id, stop_id: stop.id, source_synced_at: route.source.syncedAt }} summary={`${CITY_NAMES[route.cityCode]}・${route.district}・${route.routeName}・第 ${stop.sequence} 站 ${stop.name}`} />
             </div>
+            <StopOutcomeFeedback context={{ city: route.cityCode, district: route.district, route_id: route.id, stop_id: stop.id, source_synced_at: route.source.syncedAt }} summary={`${CITY_NAMES[route.cityCode]}・${route.district}・${route.routeName}・第 ${stop.sequence} 站 ${stop.name}`} />
           </details>)}
         </div>
         <div className="desktop-stop-table"><StopScheduleTable stops={route.stops} onSelectStop={viewStopOnMap} /></div>

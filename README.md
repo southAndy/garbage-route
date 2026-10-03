@@ -27,7 +27,8 @@ npm run dev
 
    | 欄位 | 內容 |
    | --- | --- |
-   | `entry` | `general`、`stop` 或 `empty_search` |
+   | `entry` | `general`、`stop`、`empty_search` 或 `stop_outcome` |
+   | `outcome` | 站點查詢回饋：`found`（有找到）或 `not_found`（還沒找到） |
    | `city` | 城市代碼 |
    | `district` | 行政區 |
    | `route_id` | 路線 ID |
@@ -39,6 +40,8 @@ npm run dev
 4. 發布表單，將 Share 中的 `https://tally.so/r/表單ID` 填入 `.env.local` 的 `NEXT_PUBLIC_TALLY_FORM_URL`。正式環境也要設定此變數並重新建置部署；本機需重新啟動開發伺服器。此網址是公開設定，不是 API 密鑰。
 5. 在 Tally 的 **Integrations → Google Sheets → Connect** 連接自己的 Google 帳號與試算表。可新增「處理狀態」「處理備註」欄位，初期使用待確認／處理中／已完成。
 6. 分別從三個入口提交測試回饋，確認 Tally 與試算表都有收到，站點 ID、搜尋關鍵字及來源入口正確；測試手機開關視窗、鍵盤操作和另開分頁。
+
+手機完整站點卡另提供「有找到／還沒找到」。兩種選擇皆開啟 Tally，只有使用者送出表單才會產生回覆；按鈕點擊不代表提交成功。必須在現有 Tally 表單新增 `outcome` 隱藏欄位並重新發布。建議使用條件邏輯：`entry = stop_outcome` 且 `outcome = found` 時隱藏必填的問題類型，讓使用者能直接送出；`not_found` 時提供地點不符、資訊不足、操作問題等選項。保留一般回報原有題目。分別提交兩種測試回覆，確認 `entry`、`outcome`、`stop_id` 正確；關閉未送出的表單不應新增回覆。這只能分析自願送出者的回答，不能當成全體訪客成功率。
 
 隱藏欄位只提供問題情境，不是身分驗證，也不能直接用來修改官方資料。一般回饋不會自動附上搜尋歷史或定位；查無結果入口僅傳送當次關鍵字。網站目前不代建 Tally 表單，也不代授權 Google 帳號；必須完成以上設定才可實際收件。
 

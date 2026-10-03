@@ -4,8 +4,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { feedbackUrls, type FeedbackContext } from "@/lib/feedback";
 
 export default function FeedbackButton({
-  context = { entry: "general" }, label = "意見回饋", summary,
-}: { context?: FeedbackContext; label?: string; summary?: string }) {
+  context = { entry: "general" }, label = "意見回饋", summary, dialogTitle,
+}: { context?: FeedbackContext; label?: string; summary?: string; dialogTitle?: string }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   const titleId = useId();
@@ -30,7 +30,7 @@ export default function FeedbackButton({
     }}>{label}</button>
     <dialog className="feedback-dialog" ref={dialog} aria-labelledby={titleId} onClose={() => setOpened(false)}>
       <div className="feedback-dialog-head">
-        <h2 id={titleId}>{label}</h2>
+        <h2 id={titleId}>{dialogTitle ?? label}</h2>
         <button type="button" ref={closeButton} className="feedback-close" aria-label="關閉回饋表單" onClick={() => dialog.current?.close()}>×</button>
       </div>
       {activeForm?.summary && <p className="feedback-context">{activeForm.summary}</p>}

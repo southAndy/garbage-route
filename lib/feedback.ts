@@ -1,5 +1,6 @@
 export type FeedbackContext = {
-  entry: "general" | "stop" | "empty_search";
+  entry: "general" | "stop" | "empty_search" | "stop_outcome";
+  outcome?: "found" | "not_found";
   city?: string;
   district?: string;
   route_id?: string;

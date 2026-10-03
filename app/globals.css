@@ -269,3 +269,9 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 @media (max-width:760px) and (hover:hover) {
   .mobile-stop-summary:hover { background:#f0f4f1; }
 }
+
+.stop-outcome-feedback { min-width:0; margin:24px 18px 18px; padding:12px; border:1px solid var(--line); border-radius:10px; background:#f0f4f1; }
+.stop-outcome-feedback > .stop-outcome-question { margin:0 0 10px; color:var(--ink); font-size:14px; font-weight:600; line-height:1.6; overflow-wrap:anywhere; text-wrap:pretty; }
+.stop-outcome-feedback > p { margin:0 0 12px; color:var(--muted); font-size:12px; line-height:1.6; }
+.stop-outcome-options { display:flex; flex-wrap:wrap; gap:10px; }
+.stop-outcome-options > .feedback-button { flex:1; min-width:100px; background:var(--paper); }
