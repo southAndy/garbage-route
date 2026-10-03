@@ -26,6 +26,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible { 
 .field-label { display:block; margin:13px 0 7px; color:#53625c; font-size:12px; font-weight:600; }
 .select-wrap,.search-wrap { position:relative; }
 .select-wrap:after { content:"⌄"; position:absolute; right:14px; top:10px; pointer-events:none; color:var(--green); }
+.select-wrap.is-loading:after { content:""; top:calc(50% - 8px); width:16px; height:16px; border:2px solid #cad5cf; border-top-color:var(--green); border-radius:50%; animation:spin .8s linear infinite; }
+.select-wrap select:disabled { opacity:1; color:var(--muted); -webkit-text-fill-color:var(--muted); background:#f0f4f1; cursor:default; }
 select,input { width:100%; height:45px; padding:0 14px; color:var(--ink); background:#fff; border:1px solid #ccd4ce; border-radius:9px; }
 select { appearance:none; padding-right:36px; cursor:pointer; }
 .search-wrap span { position:absolute; left:14px; top:9px; color:var(--green); font-size:20px; }
@@ -245,7 +247,7 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 .route-search-shortcut > button:focus-visible,.related-routes-disclosure > summary:focus-visible { outline:2px solid var(--green); outline-offset:3px; }
 @media (max-width:760px) {
   .filters .route-search-label { display:block; margin-top:10px; }
-  .filters .search-wrap { display:block; width:100%; margin-left:0; }
+  .filters .select-wrap,.filters .search-wrap { display:block; width:100%; margin-left:0; }
   .sidebar .search-panel-content { height:min(65dvh,calc(100dvh - 180px)); }
   .route-search-shortcut { margin-top:4px; }
   .stop-popup { max-height:calc(100% - 290px); }

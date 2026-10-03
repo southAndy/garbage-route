@@ -66,6 +66,8 @@ export default function RouteExplorer({
   const sidebarRef = useRef<HTMLElement>(null);
   const [city, setCity] = useState<CityCode>(initialRoute?.cityCode ?? initialCity);
   const [districts, setDistricts] = useState<District[]>([]);
+  const [loadingDistricts, setLoadingDistricts] = useState(true);
+  const [districtsFailed, setDistrictsFailed] = useState(false);
   const [district, setDistrict] = useState(initialRoute?.district ?? initialDistrict);
   const [routes, setRoutes] = useState<RouteSummary[]>([]);
   const [route, setRoute] = useState<GarbageRoute | null>(initialRoute);
@@ -106,15 +108,16 @@ export default function RouteExplorer({
       if (!active) return;
       const next = result.data ?? [];
       setDistricts(next);
-      if (!district || !next.some((item: District) => item.name === district)) setDistrict(next[0]?.name ?? "");
+      setDistrict((current) => next.some((item: District) => item.name === current) ? current : next[0]?.name ?? "");
       if (next.length === 0) setLoadingRoutes(false);
     }).catch(() => {
       if (!active) return;
+      setDistrictsFailed(true);
       setError("行政區載入失敗，請稍後再試。");
-      if (!district) setLoadingRoutes(false);
-    });
+      setLoadingRoutes(false);
+    }).finally(() => active && setLoadingDistricts(false));
     return () => { active = false; };
-  }, [city, district]);
+  }, [city]);
 
   useEffect(() => {
     if (!district) return;
@@ -135,6 +138,7 @@ export default function RouteExplorer({
 
   const selectCity = (nextCity: CityCode) => {
     if (nextCity === city) return;
+    setLoadingDistricts(true); setDistrictsFailed(false);
     setLoadingRoutes(true); setRoutes([]); setDistricts([]);
     setCity(nextCity); setDistrict(""); setRoute(null); setSelectedStop(null); setQuery(""); setError("");
     router.replace(`/?city=${nextCity}`);
@@ -212,7 +216,11 @@ export default function RouteExplorer({
               {(Object.keys(CITY_NAMES) as CityCode[]).map((code) => <button key={code} className={city === code ? "active" : ""} aria-pressed={city === code} onClick={() => selectCity(code)}>{CITY_NAMES[code]}</button>)}
             </div>
             <label className="field-label" htmlFor="district">行政區</label>
-            <div className="select-wrap"><select id="district" value={district} onChange={(event) => selectDistrict(event.target.value)}>{districts.map((item) => <option value={item.name} key={item.name}>{item.name}（{item.routeCount} 條）</option>)}</select></div>
+            <div className={`select-wrap ${loadingDistricts ? "is-loading" : ""}`}>
+              <select id="district" value={loadingDistricts || districts.length === 0 ? "" : district} disabled={loadingDistricts || districts.length === 0} aria-busy={loadingDistricts} onChange={(event) => selectDistrict(event.target.value)}>
+                {loadingDistricts ? <option value="">正在載入行政區…</option> : districts.length === 0 ? <option value="">{districtsFailed ? "行政區載入失敗" : "暫無可選行政區"}</option> : districts.map((item) => <option value={item.name} key={item.name}>{item.name}（{item.routeCount} 條）</option>)}
+              </select>
+            </div>
             <label className="field-label route-search-label" htmlFor="route-search">搜尋{district || CITY_NAMES[city]}的路名或停靠點</label>
             <div className="search-wrap"><span aria-hidden="true">⌕</span><input ref={searchInputRef} id="route-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={district === "士林區" ? "例如：延平北路、社子" : "輸入路名、地點或路線名稱"} /></div>
           </div>
