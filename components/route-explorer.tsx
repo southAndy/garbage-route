@@ -72,7 +72,7 @@ export default function RouteExplorer({
   const [selectedStop, setSelectedStop] = useState<GarbageStop | null>(initialRoute?.stops[0] ?? null);
   const [query, setQuery] = useState(initialQuery);
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
-  const [loadingRoutes, setLoadingRoutes] = useState(false);
+  const [loadingRoutes, setLoadingRoutes] = useState(true);
   const [error, setError] = useState(invalidSharedPath ? "分享的路線已失效，請重新選擇路線。" : "");
   const [mobileStopOpen, setMobileStopOpen] = useState(false);
   const [mapFailed, setMapFailed] = useState(false);
@@ -99,12 +99,20 @@ export default function RouteExplorer({
 
   useEffect(() => {
     let active = true;
-    fetch(`/api/v1/districts?city=${city}`).then((res) => res.json()).then((result) => {
+    fetch(`/api/v1/districts?city=${city}`).then((res) => {
+      if (!res.ok) throw new Error("District request failed");
+      return res.json();
+    }).then((result) => {
       if (!active) return;
       const next = result.data ?? [];
       setDistricts(next);
       if (!district || !next.some((item: District) => item.name === district)) setDistrict(next[0]?.name ?? "");
-    }).catch(() => setError("行政區載入失敗，請稍後再試。"));
+      if (next.length === 0) setLoadingRoutes(false);
+    }).catch(() => {
+      if (!active) return;
+      setError("行政區載入失敗，請稍後再試。");
+      if (!district) setLoadingRoutes(false);
+    });
     return () => { active = false; };
   }, [city, district]);
 
@@ -115,7 +123,10 @@ export default function RouteExplorer({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingRoutes(true);
     const search = new URLSearchParams({ city, district, q: debouncedQuery });
-    fetch(`/api/v1/routes?${search}`).then((res) => res.json()).then((result) => {
+    fetch(`/api/v1/routes?${search}`).then((res) => {
+      if (!res.ok) throw new Error("Routes request failed");
+      return res.json();
+    }).then((result) => {
       if (active) setRoutes(result.data ?? []);
     }).catch(() => active && setError("路線載入失敗，請稍後再試。"))
       .finally(() => active && setLoadingRoutes(false));
@@ -123,6 +134,8 @@ export default function RouteExplorer({
   }, [city, district, debouncedQuery]);
 
   const selectCity = (nextCity: CityCode) => {
+    if (nextCity === city) return;
+    setLoadingRoutes(true); setRoutes([]); setDistricts([]);
     setCity(nextCity); setDistrict(""); setRoute(null); setSelectedStop(null); setQuery(""); setError("");
     router.replace(`/?city=${nextCity}`);
   };
@@ -207,7 +220,7 @@ export default function RouteExplorer({
           <div className="route-results">
             <div className="results-heading"><div className="step-label"><span>02</span> 選擇路線</div><small>{loadingRoutes ? "查詢中…" : `${routes.length} 條結果`}</small></div>
             {error && <div className="alert" role="alert">{error}</div>}
-            {!loadingRoutes && routes.length === 0 ? <div className="empty-state"><span>沒有相符路線</span><p>試試其他關鍵字或行政區</p>{district && !error && <FeedbackButton label="找不到要找的地點？告訴我們" context={{ entry: "empty_search", city, district, query: debouncedQuery }} summary={`${CITY_NAMES[city]}・${district}${debouncedQuery ? `・搜尋：${debouncedQuery}` : ""}`} />}</div> : (
+            {loadingRoutes ? <div className="routes-loading" role="status"><span className="spinner" aria-hidden="true" /><span>正在載入路線資料…</span></div> : routes.length === 0 ? !error && <div className="empty-state"><span>沒有相符路線</span><p>試試其他關鍵字或行政區</p>{district && <FeedbackButton label="找不到要找的地點？告訴我們" context={{ entry: "empty_search", city, district, query: debouncedQuery }} summary={`${CITY_NAMES[city]}・${district}${debouncedQuery ? `・搜尋：${debouncedQuery}` : ""}`} />}</div> : (
               <div className="route-list">
                 {routes.map((item) => <Link key={item.id} href={routePath(item)} className={`route-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); selectRoute(item); }}>
                   <span className="route-card-top"><strong>{item.routeName}{item.tripLabel ? `・${item.tripLabel}` : ""}</strong><i>›</i></span>
