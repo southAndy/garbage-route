@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-06T01:47:53.161Z",
-  "lastCheckedAt": "2026-10-06T01:47:53.161Z",
+  "generatedAt": "2026-10-07T00:50:06.538Z",
+  "lastCheckedAt": "2026-10-07T00:50:06.538Z",
   "totals": {
     "routes": 1134,
-    "stops": 30591,
+    "stops": 30586,
     "districts": 41
   },
   "sources": {
@@ -19,11 +19,11 @@
     },
     "NTP": {
       "url": "https://data.ntpc.gov.tw/api/datasets/edc3ad26-8ae7-4916-a00b-bc6048d19bf8/csv/file",
-      "checksum": "506c01b4f768cb18c0e53d5e9df0e0c523f60489ffa7353ac2f504b255f43662",
+      "checksum": "7f590cfe6705a0bfe2b39a81c5c826ebdd18701daa646b9a4d2412b45e4f9597",
       "etag": null,
       "lastModified": null,
       "routes": 648,
-      "stops": 26579,
+      "stops": 26574,
       "districts": 29
     }
   }
