@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-07T00:50:06.538Z",
-  "lastCheckedAt": "2026-10-08T01:05:46.993Z",
+  "generatedAt": "2026-10-09T01:17:08.497Z",
+  "lastCheckedAt": "2026-10-09T01:17:08.497Z",
   "totals": {
     "routes": 1134,
     "stops": 30586,
@@ -10,7 +10,7 @@
   "sources": {
     "TPE": {
       "url": "https://data.taipei/api/dataset/6bb3304b-4f46-4bb0-8cd1-60c66dcd1cae/resource/a6e90031-7ec4-4089-afb5-361a4efe7202/download",
-      "checksum": "e2441fda9536abe56dbc048d00788695552356785390982f26948c32f303d0e7",
+      "checksum": "9cb81c51c7f9168fb5b478b60bc53c1ebeae27542f0c6119f1a35832382fb3ba",
       "etag": null,
       "lastModified": null,
       "routes": 486,

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-07T00:50:06.538Z",
+  "generatedAt": "2026-10-09T01:17:08.497Z",
   "rules": {
     "isolatedStopMinLegKm": 3,
     "isolatedStopMaxBypassKm": 3,
