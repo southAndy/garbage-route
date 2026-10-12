@@ -2,8 +2,8 @@ name: Sync official garbage routes
 
 on:
   schedule:
-    # 21:23 UTC = 05:23 Asia/Taipei. GitHub may delay scheduled runs.
-    - cron: "23 21 * * *"
+    # Sunday 21:23 UTC = Monday 05:23 Asia/Taipei. GitHub may delay scheduled runs.
+    - cron: "23 21 * * 0"
   workflow_dispatch:
 
 permissions:
