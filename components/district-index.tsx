@@ -9,10 +9,10 @@ export default function DistrictIndex({ heading = "瀏覽所有行政區" }: { h
       <div className="district-index-grid">
         {cities.map((city) => (
           <div key={city.code}>
-            <h3><Link href={cityPath(city.code)}>{city.name}垃圾車路線</Link></h3>
+            <h3><Link href={cityPath(city.code)} prefetch={false}>{city.name}垃圾車路線</Link></h3>
             <ul>
               {getDistricts(city.code).map((district) => (
-                <li key={district.slug}><Link href={districtPath(city.code, district.slug)}>{district.name}<small>{district.routeCount} 條</small></Link></li>
+                <li key={district.slug}><Link href={districtPath(city.code, district.slug)} prefetch={false}>{district.name}<small>{district.routeCount} 條</small></Link></li>
               ))}
             </ul>
           </div>

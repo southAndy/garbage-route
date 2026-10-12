@@ -39,7 +39,7 @@ export default async function CityPage({ params }: CityPageProps) {
         <ul className="hub-grid">
           {districts.map((district) => (
             <li key={district.slug}>
-              <Link href={districtPath(city, district.slug)} className="hub-card">
+              <Link href={districtPath(city, district.slug)} prefetch={false} className="hub-card">
                 <strong>{district.name}</strong>
                 <span>{district.routeCount} 條路線</span>
               </Link>

@@ -41,7 +41,7 @@ export default async function DistrictPage({ params }: DistrictPageProps) {
         <ul className="hub-grid">
           {routes.map((route) => (
             <li key={route.id}>
-              <Link href={routePath(route)} className="hub-card">
+              <Link href={routePath(route)} prefetch={false} className="hub-card">
                 <strong>{route.routeName}{route.tripLabel ? `・${route.tripLabel}` : ""}</strong>
                 <span>{route.firstArrivalTime ?? "--:--"} — {route.lastArrivalTime ?? "--:--"}・共 {route.stopCount} 站</span>
                 <small>{route.startStopName ?? "起點未提供"} → {route.endStopName ?? "終點未提供"}</small>
