@@ -181,10 +181,27 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 .feedback-note { color:var(--muted); font-size:13px; line-height:1.6; }
 .feedback-note a { color:var(--green); }
 .feedback-frame { display:block; width:100%; height: min(560px,60dvh); border:0; }
+.mobile-survey-invite { display:none; }
 @media (max-width:760px) {
   .header-actions { gap:8px; }
-  .header-actions .feedback-button { padding:8px; font-size:12px; }
+  .header-actions > .feedback-button { display:none; }
+  body:has(.mobile-survey-invite) { --mobile-survey-height:calc(76px + env(safe-area-inset-bottom,0px)); padding-bottom:var(--mobile-survey-height); }
+  html:has(.mobile-survey-invite) { scroll-padding-bottom:calc(88px + env(safe-area-inset-bottom,0px)); }
+  body:has(.mobile-survey-invite) .workspace { height:calc(100vh - 62px - var(--mobile-survey-height)); height:calc(100dvh - 62px - var(--mobile-survey-height)); min-height:0; }
+  .mobile-survey-invite { position:fixed; inset:auto 0 0; z-index:30; display:flex; align-items:center; justify-content:space-between; gap:12px; height:var(--mobile-survey-height); padding:12px max(12px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px)); background:var(--paper); border-top:1px solid var(--line); box-shadow:0 -4px 18px rgba(23,60,48,.08); }
+  .mobile-survey-invite strong { display:block; font-size:14px; line-height:1.5; }
+  .mobile-survey-invite p { margin:3px 0 0; font-size:11px; line-height:1.5; color:var(--muted); }
+  .mobile-survey-invite > .feedback-button { flex-shrink:0; padding:11px 16px; background:var(--green); border-color:var(--green); color:white; font-size:14px; font-weight:700; }
+  .mobile-survey-invite > .feedback-button:hover { background:var(--ink); }
   .feedback-dialog { width:calc(100% - 20px); padding:16px; max-height:94dvh; }
+}
+
+/* Older webviews cannot reserve space using :has(); keep the invitation in flow. */
+@supports not selector(:has(*)) {
+  @media (max-width:760px) {
+    .mobile-survey-invite { position:static; height:auto; min-height:76px; padding:12px; }
+    .header-actions > .feedback-button { display:inline-block; padding:8px; font-size:12px; }
+  }
 }
 
 /* Route landing page: clear shortcuts between the schedule and map. */
