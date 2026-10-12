@@ -188,7 +188,9 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
   body:has(.mobile-survey-invite) .header-actions > .feedback-button { display:none; }
   body:has(.mobile-survey-invite) { --mobile-survey-height:calc(76px + env(safe-area-inset-bottom,0px)); padding-bottom:var(--mobile-survey-height); }
   html:has(.mobile-survey-invite) { scroll-padding-bottom:calc(88px + env(safe-area-inset-bottom,0px)); }
-  body:has(.mobile-survey-invite) .workspace { height:calc(100vh - 62px - var(--mobile-survey-height)); height:calc(100dvh - 62px - var(--mobile-survey-height)); min-height:0; }
+  .explorer-viewport { display:flex; flex-direction:column; height:calc(100vh - var(--mobile-survey-height,0px)); height:calc(100dvh - var(--mobile-survey-height,0px)); }
+  .explorer-viewport > .app-header,.explorer-viewport > .breadcrumb { flex-shrink:0; }
+  .explorer-viewport > .workspace { flex:1; height:auto; min-height:0; }
   .mobile-survey-invite { position:fixed; inset:auto 0 0; z-index:30; display:flex; align-items:center; justify-content:space-between; gap:12px; height:var(--mobile-survey-height); padding:12px max(12px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px)); background:var(--paper); border-top:1px solid var(--line); box-shadow:0 -4px 18px rgba(23,60,48,.08); }
   .mobile-survey-invite strong { display:block; font-size:14px; line-height:1.5; }
   .mobile-survey-invite p { margin:3px 0 0; font-size:11px; line-height:1.5; color:var(--muted); }
@@ -200,7 +202,7 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 /* Older webviews cannot reserve space using :has(); keep the invitation in flow. */
 @supports not selector(:has(*)) {
   @media (max-width:760px) {
-    .mobile-survey-invite { position:static; height:auto; min-height:76px; padding:12px; }
+    .mobile-survey-invite { position:static; height:auto; min-height:76px; flex-shrink:0; padding:12px; }
     .header-actions > .feedback-button { display:inline-block; padding:8px; font-size:12px; }
   }
 }

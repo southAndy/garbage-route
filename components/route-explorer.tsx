@@ -199,6 +199,7 @@ export default function RouteExplorer({
   return (
     <main className="app-shell">
       {syncQueryFromUrl && <Suspense fallback={null}><SearchParamQuery onQuery={setQuery} /></Suspense>}
+      <div className="explorer-viewport">
       <SiteHeader />
       {breadcrumb}
 
@@ -285,6 +286,8 @@ export default function RouteExplorer({
           </article>}
         </section>
       </section>
+
+      </div>
 
       {route && <section id="route-stops" className="stops-section" tabIndex={-1} aria-label="完整停靠點列表">
         <div className="stops-title"><div><p className="eyebrow">COMPLETE ROUTE</p><h2>完整停靠點</h2></div><p>路線線條依官方停靠點順序繪製，僅供路線範圍參考。</p></div>
