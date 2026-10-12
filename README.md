@@ -66,15 +66,15 @@ npm run sync:data
 
 每條路線在地圖及站點時間軸下方，直接輸出所有站點的地址、抵達／離開時間、一般垃圾／資源回收／廚餘清運星期及備註。這些文字包含在初始 HTML，無須點選站點或載入地圖。沒有提供的欄位會標示未提供，不推測清運日；表定時間仍可能因假日或臨時公告調整。
 
-## 每日同步與 Vercel 部署
+## 每週同步與 Vercel 部署
 
-`.github/workflows/sync-data.yml` 每天 **台北時間 05:23（UTC 21:23）** 排程執行，也支援 GitHub Actions 的 **Run workflow** 手動執行。GitHub 排程可能延遲，並非準點保證。
+`.github/workflows/sync-data.yml` 每週一 **台北時間 05:23（週日 UTC 21:23）** 排程執行，也支援 GitHub Actions 的 **Run workflow** 手動執行。GitHub 排程可能延遲，並非準點保證。官方資料異動會在下次成功同步後反映；需要提前更新時可手動執行。
 
 流程：下載兩市資料 → 品質檢查 → 測試與 lint → 正式建置 → 提交資料與檢查時間 → 呼叫 Vercel Deploy Hook。任一步驟失敗都會停止，下載或品質檢查失敗不會提交資料或觸發部署。來源內容沒變時仍會部署，讓網站顯示最新的成功檢查時間；sitemap 的路線 `lastModified` 仍使用資料同步時間。
 
 啟用一次即可：
 
-1. 在 Vercel 專案 **Settings → Git → Deploy Hooks** 建立 `daily-data-sync`，選擇正式分支 `main`。
+1. 在 Vercel 專案 **Settings → Git → Deploy Hooks** 建立 `weekly-data-sync`，選擇正式分支 `main`。既有的 `daily-data-sync` Hook 可繼續使用，名稱不影響排程，不需重建。
 2. 在 GitHub repository **Settings → Secrets and variables → Actions → New repository secret** 新增 `VERCEL_DEPLOY_HOOK`，值為剛產生的完整 Hook URL。不要把 URL 寫進程式碼或公開日誌。
 3. 將 workflow 與程式碼推送至 repository 預設分支（目前為 `main`）。Vercel 正式分支與 Hook 分支必須和它一致；分支規則須允許此工作流程提交 `data/` 更新。
 4. 到 **Actions → Sync official garbage routes → Run workflow** 執行一次，確認所有步驟成功，再到 Vercel 確認部署為 Ready，抽查路線頁的「最後成功檢查」。Hook 請求成功只代表部署已受理，不代表建置已完成。

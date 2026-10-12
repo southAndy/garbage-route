@@ -78,8 +78,8 @@ export default function RouteExplorer({
   const [error, setError] = useState(invalidSharedPath ? "分享的路線已失效，請重新選擇路線。" : "");
   const [mobileStopOpen, setMobileStopOpen] = useState(false);
   const [mapFailed, setMapFailed] = useState(false);
-  // Once a route is chosen the mobile sheet collapses so the map and stop popup stay visible.
-  const [mobilePanelOpen, setMobilePanelOpen] = useState(!initialRoute);
+  // Keep the mobile map visible on entry; users open the search sheet explicitly.
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
 
   useEffect(() => {
     if (!isMobile || !mobilePanelOpen) return;
@@ -206,7 +206,7 @@ export default function RouteExplorer({
         <aside ref={sidebarRef} className={`sidebar ${mobilePanelOpen ? "is-open" : ""}`} aria-label="路線查詢">
           <button className="sheet-handle" aria-expanded={mobilePanelOpen} aria-controls="route-search-panel" onClick={() => setMobilePanelOpen((open) => !open)}>
             <span className="sheet-grip" aria-hidden="true" />
-            <span className="sheet-label"><strong>{district || CITY_NAMES[city]}</strong><span>{mobilePanelOpen ? "收合路線搜尋" : "搜尋其他路線"}</span><span aria-hidden="true">{mobilePanelOpen ? "⌄" : "⌃"}</span></span>
+            <span className="sheet-label"><strong>{district || CITY_NAMES[city]}</strong><span>{mobilePanelOpen ? "收合路線搜尋" : route ? "搜尋其他路線" : "搜尋垃圾車路線"}</span><span aria-hidden="true">{mobilePanelOpen ? "⌄" : "⌃"}</span></span>
           </button>
           <div id="route-search-panel" className="search-panel-content" hidden={isMobile && !mobilePanelOpen}>
           {(!isMobile || mobilePanelOpen) && <>

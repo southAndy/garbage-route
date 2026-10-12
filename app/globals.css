@@ -184,7 +184,8 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 .mobile-survey-invite { display:none; }
 @media (max-width:760px) {
   .header-actions { gap:8px; }
-  .header-actions > .feedback-button { display:none; }
+  .header-actions > .feedback-button { padding:8px; font-size:12px; }
+  body:has(.mobile-survey-invite) .header-actions > .feedback-button { display:none; }
   body:has(.mobile-survey-invite) { --mobile-survey-height:calc(76px + env(safe-area-inset-bottom,0px)); padding-bottom:var(--mobile-survey-height); }
   html:has(.mobile-survey-invite) { scroll-padding-bottom:calc(88px + env(safe-area-inset-bottom,0px)); }
   body:has(.mobile-survey-invite) .workspace { height:calc(100vh - 62px - var(--mobile-survey-height)); height:calc(100dvh - 62px - var(--mobile-survey-height)); min-height:0; }
