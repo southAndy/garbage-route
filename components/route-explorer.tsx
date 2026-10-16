@@ -18,6 +18,7 @@ import { GEOLOCATION_OPTIONS, locateErrorState, locateMessage, queryGeolocationP
 import type { NearbyResult } from "@/lib/nearby-search";
 import NearbyRouteCard from "./nearby-route-card";
 import { partitionNearbyRoutes, taipeiClock } from "@/lib/stop-timing";
+import { clearLocationSession, getLocationSession, setLocationSession, useLocationSession } from "@/lib/user-location";
 
 const RouteMap = dynamic(() => import("./route-map"), { ssr: false, loading: () => <div className="map-loading"><span className="spinner" />正在準備地圖…</div> });
 
@@ -85,8 +86,11 @@ export default function RouteExplorer({
   // Keep the mobile map visible on entry; users open the search sheet explicitly.
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   // Nearby mode replaces the district result list until the user types or changes area.
-  const [nearby, setNearby] = useState<NearbyResult | null>(null);
-  const [locateState, setLocateState] = useState<LocateState>("idle");
+  // It lives in a module store so it survives the remount when navigating into a route page.
+  const locationSession = useLocationSession();
+  const nearby = locationSession?.nearby ?? null;
+  const userPosition = locationSession?.position ?? null;
+  const [locateState, setLocateState] = useState<LocateState>(() => getLocationSession() ? "ready" : "idle");
   const [geoPermission, setGeoPermission] = useState<GeolocationPermission>("prompt");
   const [userAgent, setUserAgent] = useState("");
   // Re-render once a minute while nearby results are showing so "already passed" stays current.
@@ -173,7 +177,7 @@ export default function RouteExplorer({
   }, [city, district, debouncedQuery]);
 
   const clearNearby = useCallback(() => {
-    setNearby(null);
+    clearLocationSession();
     setLocateState((current) => current === "ready" ? "idle" : current);
   }, []);
 
@@ -204,9 +208,13 @@ export default function RouteExplorer({
         if (!response.ok) throw new Error("Nearby request failed");
         const result = await response.json();
         const data = result.data as NearbyResult;
-        if (!data.resolved) { setNearby(null); setLocateState("outOfArea"); return; }
+        if (!data.resolved) { clearLocationSession(); setLocateState("outOfArea"); return; }
         applyResolvedArea(data.resolved.city, data.resolved.district);
-        setNearby(data);
+        // The exact fix stays on the device for the map marker; only the rounded point was sent.
+        setLocationSession({
+          nearby: data,
+          position: { lat: position.coords.latitude, lng: position.coords.longitude, accuracy: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null, locatedAt: Date.now() },
+        });
         setLocateState("ready");
       } catch {
         setLocateState("failed");
@@ -362,7 +370,7 @@ export default function RouteExplorer({
         </aside>
 
         <section className="map-stage" ref={mapStageRef} tabIndex={-1} aria-label="路線地圖與所選停靠點">
-          {mapFailed ? <div className="map-fallback"><strong>地圖目前無法載入</strong><p>仍可從路線面板查看完整停靠點。</p><button onClick={() => { setMapFailed(false); window.location.reload(); }}>重新載入</button></div> : <RouteMap route={route} selectedStop={selectedStop} onSelectStop={chooseStop} onMapError={handleMapError} />}
+          {mapFailed ? <div className="map-fallback"><strong>地圖目前無法載入</strong><p>仍可從路線面板查看完整停靠點。</p><button onClick={() => { setMapFailed(false); window.location.reload(); }}>重新載入</button></div> : <RouteMap route={route} selectedStop={selectedStop} userPosition={userPosition} onSelectStop={chooseStop} onMapError={handleMapError} />}
           {!route && !invalidSharedPath && <div className="map-intro"><p className="eyebrow">TAIPEI · NEW TAIPEI</p><h1>台北、新北<br />垃圾車時間與路線查詢</h1><p>今晚的垃圾車會停在哪裡？<br />選擇城市、行政區與路線，查看每一站的表定時間。</p><div className="intro-steps"><span><b>1</b>選城市</span><i>→</i><span><b>2</b>選行政區</span><i>→</i><span><b>3</b>看路線</span></div></div>}
           {route && validCount === 0 && <div className="map-warning">此路線暫無可用地圖位置，請查看文字停靠點列表。</div>}
           {route && warningCount > 0 && <div className="map-warning coordinate-review-warning" role="status">此路線有 {warningCount} 項位置待確認，橘色虛線為可疑區段。</div>}

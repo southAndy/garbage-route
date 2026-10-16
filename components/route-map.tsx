@@ -7,12 +7,28 @@ import type { GeoJSONSource, Map as MapLibreMap, StyleSpecification } from "mapl
 import type { GarbageRoute, GarbageStop } from "@/lib/types";
 import { makeMapStyleCompatible } from "@/lib/map-style";
 import { createDisplayGeometries, suspiciousStopIds } from "@/lib/route-display";
+import { nearestStopDistanceMeters, ROUTE_FOCUS_LIMIT_METERS, type UserPosition } from "@/lib/user-location";
 
 interface Props {
   route: GarbageRoute | null;
   selectedStop: GarbageStop | null;
+  userPosition?: UserPosition | null;
   onSelectStop: (stop: GarbageStop) => void;
   onMapError: () => void;
+}
+
+const USER_LAYERS = ["user-location-halo", "user-location-dot"] as const;
+
+function ensureUserLayers(map: MapLibreMap) {
+  if (map.getSource("user-location")) return;
+  map.addSource("user-location", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({ id: "user-location-halo", type: "circle", source: "user-location", paint: { "circle-radius": 18, "circle-color": "#2f6fd6", "circle-opacity": 0.18 } });
+  map.addLayer({ id: "user-location-dot", type: "circle", source: "user-location", paint: { "circle-radius": 7, "circle-color": "#2f6fd6", "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 } });
+}
+
+// Route layers may be added after the user dot; keep the dot above them.
+function raiseUserLayers(map: MapLibreMap) {
+  for (const id of USER_LAYERS) if (map.getLayer(id)) map.moveLayer(id);
 }
 
 const TWIN_CITY_BOUNDS: [[number, number], [number, number]] = [[121.30, 24.82], [121.72, 25.22]];
@@ -29,7 +45,7 @@ function selectedStopOffset(mapElement: HTMLElement): [number, number] {
   return [0, ((badge?.bottom ?? stage.top) + popup.top) / 2 - centerY];
 }
 
-export default function RouteMap({ route, selectedStop, onSelectStop, onMapError }: Props) {
+export default function RouteMap({ route, selectedStop, userPosition = null, onSelectStop, onMapError }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const routeRef = useRef(route);
@@ -158,6 +174,7 @@ export default function RouteMap({ route, selectedStop, onSelectStop, onMapError
       });
       map.addSource("selected-stop", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
       map.addLayer({ id: "selected-stop", type: "circle", source: "selected-stop", paint: { "circle-radius": 15, "circle-color": "#f5b840", "circle-stroke-color": "#173c30", "circle-stroke-width": 4 } });
+      raiseUserLayers(map);
     } else {
       (map.getSource("route-line") as GeoJSONSource).setData(line);
       (map.getSource("route-suspicious-line") as GeoJSONSource).setData(suspiciousLine);
@@ -168,11 +185,34 @@ export default function RouteMap({ route, selectedStop, onSelectStop, onMapError
         (box, stop) => box.extend([stop.longitude!, stop.latitude!]),
         new maplibregl.LngLatBounds([trustedStops[0].longitude!, trustedStops[0].latitude!], [trustedStops[0].longitude!, trustedStops[0].latitude!]),
       );
+      // Frame the user together with the route only when they are close; otherwise the route alone.
+      const distance = userPosition ? nearestStopDistanceMeters(userPosition, trustedStops) : null;
+      if (userPosition && distance !== null && distance <= ROUTE_FOCUS_LIMIT_METERS) bounds.extend([userPosition.lng, userPosition.lat]);
       map.fitBounds(bounds, { padding: { top: 90, bottom: 90, left: 70, right: 70 }, maxZoom: 16, duration: 700 });
+    } else if (userPosition) {
+      map.easeTo({ center: [userPosition.lng, userPosition.lat], zoom: Math.max(map.getZoom(), 15), duration: 700 });
     } else {
       map.fitBounds(TWIN_CITY_BOUNDS, { padding: 36 });
     }
-  }, [ready, route]);
+  }, [ready, route, userPosition]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    ensureUserLayers(map);
+    raiseUserLayers(map);
+    const featureCollection: GeoJSON.FeatureCollection = {
+      type: "FeatureCollection",
+      features: userPosition ? [{ type: "Feature", geometry: { type: "Point", coordinates: [userPosition.lng, userPosition.lat] }, properties: {} }] : [],
+    };
+    (map.getSource("user-location") as GeoJSONSource).setData(featureCollection);
+  }, [ready, userPosition]);
+
+  const flyToUser = () => {
+    const map = mapRef.current;
+    if (!map || !userPosition) return;
+    map.easeTo({ center: [userPosition.lng, userPosition.lat], zoom: Math.max(map.getZoom(), 15), duration: 600 });
+  };
 
   useEffect(() => {
     const map = mapRef.current;
@@ -191,5 +231,8 @@ export default function RouteMap({ route, selectedStop, onSelectStop, onMapError
     }
   }, [ready, selectedStop]);
 
-  return <div ref={container} className="map-canvas" aria-label="選中垃圾車路線地圖" />;
+  return <>
+    <div ref={container} className="map-canvas" aria-label="選中垃圾車路線地圖" />
+    {ready && userPosition && <button type="button" className="locate-me-button" onClick={flyToUser} aria-label="回到我的位置" title="回到我的位置"><span aria-hidden="true" /></button>}
+  </>;
 }
