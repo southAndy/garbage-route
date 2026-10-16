@@ -175,7 +175,7 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
   .app-header { height:62px; padding:0 15px; }.brand-mark { width:34px;height:34px; }.brand strong { font-size:17px; }.brand small,.desktop-only { display:none; }.header-note { font-size:10px; }
   .workspace { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr) 74px; height:calc(100dvh - 62px); min-height:520px; position:relative; }.map-stage { position:relative; inset:auto; grid-row:1; min-height:0; }.map-intro { left:16px; top:24px; width:calc(100% - 32px); transform:none; padding:24px 25px; }.map-intro h1 { font-size:32px; }.intro-steps { flex-wrap:wrap; }
   .sidebar { position:relative; grid-row:2; z-index:15; height:74px; border:0; border-top:1px solid var(--line); }
-  .sidebar .search-panel-content { position:absolute; bottom:100%; left:0; right:0; height:min(55dvh,calc(100dvh - 180px)); max-height:calc(100dvh - 180px); background:var(--paper); border-radius:18px 18px 0 0; box-shadow:0 -10px 35px rgba(23,60,48,.17); overflow:hidden; }
+  .sidebar .search-panel-content { position:absolute; bottom:100%; left:0; right:0; height:min(55dvh,calc(var(--viewport-height,100dvh) - 180px)); max-height:calc(var(--viewport-height,100dvh) - 180px); background:var(--paper); border-radius:18px 18px 0 0; box-shadow:0 -10px 35px rgba(23,60,48,.17); overflow:hidden; }
   .sheet-handle { display:block; height:24px; flex:0 0 24px; background:transparent; border:0; cursor:pointer; }.sheet-handle span { display:block; width:40px; height:4px; margin:9px auto; background:#ccd1ce; border-radius:2px; }.filters { padding:7px 16px 12px; }.filters .step-label { display:none; }.city-tabs { margin:3px 0 8px; }.city-tabs button { height:35px; }.field-label { display:none; }.select-wrap,.search-wrap { width:calc(50% - 4px); display:inline-block; vertical-align:top; }.search-wrap { margin-left:8px; }.select-wrap select,.search-wrap input { height:40px; font-size:16px; } /* 16px: iOS Safari zooms the page when focusing smaller inputs */
   .route-results { padding-top:12px; }.route-list { padding-bottom:15px; }.route-card { padding:13px 14px; }.route-card-top strong { font-size:14px; }.route-time { font-size:15px; }.nearby-stops li { font-size:12px; }.nearby-badge { font-size:10px; }.locate-row { margin-top:6px; }
   .route-badge { top:12px; left:12px; min-width:200px; padding:11px 14px; }.route-badge h1 { font-size:15px; }.route-summary { display:none; }.stop-popup { left:12px; right:12px; bottom:12px; width:auto; max-height:calc(100% - 190px); }.map-warning { width:calc(100% - 30px); top:80px; text-align:center; }
@@ -231,7 +231,8 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
   body:has(.mobile-survey-invite) .header-actions > .feedback-button { display:none; }
   body:has(.mobile-survey-invite) { --mobile-survey-height:calc(76px + env(safe-area-inset-bottom,0px)); padding-bottom:var(--mobile-survey-height); }
   html:has(.mobile-survey-invite) { scroll-padding-bottom:calc(88px + env(safe-area-inset-bottom,0px)); }
-  .explorer-viewport { display:flex; flex-direction:column; height:calc(100vh - var(--mobile-survey-height,0px)); height:calc(100dvh - var(--mobile-survey-height,0px)); }
+  /* --viewport-height is set from visualViewport while the on-screen keyboard is open so the bottom sheet stays above it. */
+  .explorer-viewport { display:flex; flex-direction:column; height:calc(100vh - var(--mobile-survey-height,0px)); height:calc(var(--viewport-height,100dvh) - var(--mobile-survey-height,0px)); }
   .explorer-viewport > .app-header,.explorer-viewport > .breadcrumb { flex-shrink:0; }
   .explorer-viewport > .workspace { flex:1; height:auto; min-height:0; }
   .mobile-survey-invite { position:fixed; inset:auto 0 0; z-index:30; display:flex; align-items:center; justify-content:space-between; gap:12px; height:var(--mobile-survey-height); padding:12px max(12px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px)); background:var(--paper); border-top:1px solid var(--line); box-shadow:0 -4px 18px rgba(23,60,48,.08); }
@@ -311,7 +312,7 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 @media (max-width:760px) {
   .filters .route-search-label { display:block; margin-top:10px; }
   .filters .select-wrap,.filters .search-wrap { display:block; width:100%; margin-left:0; }
-  .sidebar .search-panel-content { height:min(65dvh,calc(100dvh - 180px)); }
+  .sidebar .search-panel-content { height:min(65dvh,calc(var(--viewport-height,100dvh) - 180px)); }
   .route-search-shortcut { margin-top:4px; }
   .stop-popup { max-height:calc(100% - 290px); }
 }

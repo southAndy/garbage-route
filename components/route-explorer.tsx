@@ -134,6 +134,31 @@ export default function RouteExplorer({
     return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
   }, [isMobile, mobilePanelOpen]);
 
+  // Mobile browsers keep 100dvh while the on-screen keyboard is open and only shrink the visual
+  // viewport, which leaves the bottom sheet (and the focused input) hidden under the keyboard.
+  // Mirror the visual height into CSS so the layout shrinks above the keyboard instead.
+  useEffect(() => {
+    if (!isMobile) return;
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const root = document.documentElement;
+    const update = () => {
+      const keyboardOpen = window.innerHeight - viewport.height > 120;
+      if (!keyboardOpen) { root.style.removeProperty("--viewport-height"); return; }
+      root.style.setProperty("--viewport-height", `${Math.round(viewport.height)}px`);
+      // iOS pans the page toward the focused input; keep the layout anchored to the top instead.
+      if (window.scrollY > 0 || viewport.offsetTop > 0) window.scrollTo(0, 0);
+    };
+    viewport.addEventListener("resize", update);
+    viewport.addEventListener("scroll", update);
+    update();
+    return () => {
+      viewport.removeEventListener("resize", update);
+      viewport.removeEventListener("scroll", update);
+      root.style.removeProperty("--viewport-height");
+    };
+  }, [isMobile]);
+
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query), 300);
     return () => window.clearTimeout(timer);
