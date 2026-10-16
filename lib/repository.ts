@@ -2,7 +2,9 @@ import routesData from "@/data/routes.json";
 import manifestData from "@/data/manifest.json";
 import suspiciousCoordinatesData from "@/data/suspicious-coordinates.json";
 import type { SuspiciousCoordinateReport } from "./coordinate-quality";
-import type { CityCode, GarbageRoute, RouteCoordinateWarning, RouteSummary } from "./types";
+import { createNearbyIndex, searchNearby, type GeoPoint, type NearbyIndex, type NearbyRadius } from "./nearby-search";
+import { toSummary } from "./route-summary";
+import type { CityCode, GarbageRoute, RouteCoordinateWarning } from "./types";
 
 export { CITY_NAMES, cityPath, districtPath, parseCityCode, routePath } from "./paths";
 
@@ -51,22 +53,6 @@ export function getDistricts(city: CityCode) {
   return [...counts.values()].sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
 }
 
-function toSummary(route: GarbageRoute): RouteSummary {
-  return {
-    id: route.id,
-    cityCode: route.cityCode,
-    district: route.district,
-    districtSlug: route.districtSlug,
-    routeName: route.routeName,
-    tripLabel: route.tripLabel,
-    firstArrivalTime: route.firstArrivalTime,
-    lastArrivalTime: route.lastArrivalTime,
-    startStopName: route.stops[0]?.name ?? null,
-    endStopName: route.stops.at(-1)?.name ?? null,
-    stopCount: route.stopCount,
-  };
-}
-
 export function findRoutes(city: CityCode, district: string, query = "") {
   const needle = query.trim().toLocaleLowerCase("zh-Hant");
   return routes
@@ -81,6 +67,16 @@ export function findRoutes(city: CityCode, district: string, query = "") {
       return searchable.includes(needle);
     })
     .map(toSummary);
+}
+
+let nearbyIndex: NearbyIndex | null = null;
+
+export function findNearby(point: GeoPoint, radius?: NearbyRadius) {
+  if (!nearbyIndex) {
+    const suspiciousStopIds = new Set([...warningsByRoute.values()].flat().flatMap((warning) => warning.affectedStopIds));
+    nearbyIndex = createNearbyIndex(routes, suspiciousStopIds);
+  }
+  return searchNearby(nearbyIndex, point, radius);
 }
 
 export function getRoute(id: string) {

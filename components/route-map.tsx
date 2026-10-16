@@ -7,12 +7,43 @@ import type { GeoJSONSource, Map as MapLibreMap, StyleSpecification } from "mapl
 import type { GarbageRoute, GarbageStop } from "@/lib/types";
 import { makeMapStyleCompatible } from "@/lib/map-style";
 import { createDisplayGeometries, suspiciousStopIds } from "@/lib/route-display";
+import { accuracyRingRadii, nearestStopDistanceMeters, ROUTE_FOCUS_LIMIT_METERS, type UserPosition } from "@/lib/user-location";
 
 interface Props {
   route: GarbageRoute | null;
   selectedStop: GarbageStop | null;
+  userPosition?: UserPosition | null;
   onSelectStop: (stop: GarbageStop) => void;
   onMapError: () => void;
+}
+
+const USER_LAYERS = ["user-location-accuracy", "user-location-dot"] as const;
+
+function ensureUserLayers(map: MapLibreMap) {
+  if (map.getSource("user-location")) return;
+  map.addSource("user-location", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  // The accuracy ring is a ground-fixed circle: its pixel radius doubles with every zoom level.
+  map.addLayer({
+    id: "user-location-accuracy",
+    type: "circle",
+    source: "user-location",
+    filter: ["has", "r0"],
+    paint: {
+      "circle-radius": ["interpolate", ["exponential", 2], ["zoom"], 0, ["get", "r0"], 22, ["get", "r22"]],
+      "circle-color": "#2f6fd6",
+      "circle-opacity": 0.14,
+      "circle-stroke-color": "#2f6fd6",
+      "circle-stroke-opacity": 0.4,
+      "circle-stroke-width": 1,
+      "circle-pitch-alignment": "map",
+    },
+  });
+  map.addLayer({ id: "user-location-dot", type: "circle", source: "user-location", paint: { "circle-radius": 7, "circle-color": "#2f6fd6", "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 } });
+}
+
+// Route layers may be added after the user dot; keep the dot above them.
+function raiseUserLayers(map: MapLibreMap) {
+  for (const id of USER_LAYERS) if (map.getLayer(id)) map.moveLayer(id);
 }
 
 const TWIN_CITY_BOUNDS: [[number, number], [number, number]] = [[121.30, 24.82], [121.72, 25.22]];
@@ -29,27 +60,54 @@ function selectedStopOffset(mapElement: HTMLElement): [number, number] {
   return [0, ((badge?.bottom ?? stage.top) + popup.top) / 2 - centerY];
 }
 
-export default function RouteMap({ route, selectedStop, onSelectStop, onMapError }: Props) {
-  const container = useRef<HTMLDivElement>(null);
+// One MapLibre instance per page load. The home and route pages each mount
+// their own explorer, so navigating between them unmounts this component;
+// rebuilding the map on every navigation refetches the style and tiles and
+// shows the user a blank map twice. The instance and its DOM node are kept
+// here and re-attached to whichever RouteMap is currently mounted.
+interface CachedMap {
+  map: MapLibreMap;
+  element: HTMLDivElement;
+  loaded: boolean;
+}
+
+const activeHandlers: { onSelectStop: (stop: GarbageStop) => void; getRoute: () => GarbageRoute | null } = {
+  onSelectStop: () => {},
+  getRoute: () => null,
+};
+let cachedMap: CachedMap | null = null;
+
+export default function RouteMap({ route, selectedStop, userPosition = null, onSelectStop, onMapError }: Props) {
+  const wrapper = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const routeRef = useRef(route);
-  const [ready, setReady] = useState(false);
+  // A re-adopted map that already fired "load" is usable immediately.
+  const [ready, setReady] = useState(() => cachedMap?.loaded ?? false);
 
   useEffect(() => { routeRef.current = route; }, [route]);
 
   useEffect(() => {
-    if (!container.current || mapRef.current) return;
+    const host = wrapper.current;
+    if (!host) return;
+    activeHandlers.onSelectStop = onSelectStop;
+    activeHandlers.getRoute = () => routeRef.current;
+
+    if (cachedMap) {
+      const cached = cachedMap;
+      host.appendChild(cached.element);
+      mapRef.current = cached.map;
+      cached.map.resize();
+      if (!cached.loaded) cached.map.once("load", () => setReady(true));
+      return () => {
+        if (cached.element.parentElement === host) host.removeChild(cached.element);
+        mapRef.current = null;
+      };
+    }
+
     let cancelled = false;
-    let map: MapLibreMap | null = null;
+    let created: CachedMap | null = null;
     let loadTimeout: number | undefined;
     const controller = new AbortController();
-    const mobileViewport = window.matchMedia("(max-width: 760px)");
-    const updateGestures = () => {
-      if (!map) return;
-      if (mobileViewport.matches) map.cooperativeGestures.enable();
-      else map.cooperativeGestures.disable();
-    };
-    mobileViewport.addEventListener("change", updateGestures);
     const initialize = async () => {
       // MapLibre's inferred worker URL is not preserved by Next's client bundlers.
       maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
@@ -63,9 +121,15 @@ export default function RouteMap({ route, selectedStop, onSelectStop, onMapError
         if (controller.signal.aborted) return;
         console.warn("無法預先處理底圖樣式，改由 MapLibre 直接載入。", error);
       }
-      if (cancelled || !container.current) return;
-      map = new maplibregl.Map({
-        container: container.current,
+      if (cancelled || !wrapper.current) return;
+      const element = document.createElement("div");
+      element.className = "map-canvas-inner";
+      // Inline so MapLibre's own `.maplibregl-map { position: relative }` cannot collapse it.
+      element.style.cssText = "position:absolute;inset:0;";
+      wrapper.current.appendChild(element);
+      const mobileViewport = window.matchMedia("(max-width: 760px)");
+      const map = new maplibregl.Map({
+        container: element,
         style,
         bounds: TWIN_CITY_BOUNDS,
         fitBoundsOptions: { padding: 36 },
@@ -77,26 +141,33 @@ export default function RouteMap({ route, selectedStop, onSelectStop, onMapError
           "CooperativeGesturesHandler.MacHelpText": "按住 ⌘ 並滾動以縮放地圖",
         },
       });
+      created = { map, element, loaded: false };
+      cachedMap = created;
+      mapRef.current = map;
+      // The map outlives this component, so the viewport listener is never removed.
+      mobileViewport.addEventListener("change", () => {
+        if (mobileViewport.matches) map.cooperativeGestures.enable();
+        else map.cooperativeGestures.disable();
+      });
       loadTimeout = window.setTimeout(() => onMapError(), 15_000);
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
       map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
-      map.on("load", () => { window.clearTimeout(loadTimeout); setReady(true); });
+      map.on("load", () => { window.clearTimeout(loadTimeout); created!.loaded = true; if (!cancelled) setReady(true); });
       map.on("click", "route-stops", (event) => {
         const id = event.features?.[0]?.properties?.id;
-        const stop = routeRef.current?.stops.find((item) => item.id === id);
-        if (stop) onSelectStop(stop);
+        const stop = activeHandlers.getRoute()?.stops.find((item) => item.id === id);
+        if (stop) activeHandlers.onSelectStop(stop);
       });
-      map.on("mouseenter", "route-stops", () => { if (map) map.getCanvas().style.cursor = "pointer"; });
-      map.on("mouseleave", "route-stops", () => { if (map) map.getCanvas().style.cursor = ""; });
-      mapRef.current = map;
+      map.on("mouseenter", "route-stops", () => { map.getCanvas().style.cursor = "pointer"; });
+      map.on("mouseleave", "route-stops", () => { map.getCanvas().style.cursor = ""; });
     };
     void initialize();
     return () => {
       cancelled = true;
       controller.abort();
-      mobileViewport.removeEventListener("change", updateGestures);
       if (loadTimeout) window.clearTimeout(loadTimeout);
-      map?.remove();
+      // Detach rather than destroy: the next RouteMap re-adopts the same map.
+      if (created && created.element.parentElement === host) host.removeChild(created.element);
       mapRef.current = null;
     };
   }, [onMapError, onSelectStop]);
@@ -158,6 +229,7 @@ export default function RouteMap({ route, selectedStop, onSelectStop, onMapError
       });
       map.addSource("selected-stop", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
       map.addLayer({ id: "selected-stop", type: "circle", source: "selected-stop", paint: { "circle-radius": 15, "circle-color": "#f5b840", "circle-stroke-color": "#173c30", "circle-stroke-width": 4 } });
+      raiseUserLayers(map);
     } else {
       (map.getSource("route-line") as GeoJSONSource).setData(line);
       (map.getSource("route-suspicious-line") as GeoJSONSource).setData(suspiciousLine);
@@ -168,11 +240,34 @@ export default function RouteMap({ route, selectedStop, onSelectStop, onMapError
         (box, stop) => box.extend([stop.longitude!, stop.latitude!]),
         new maplibregl.LngLatBounds([trustedStops[0].longitude!, trustedStops[0].latitude!], [trustedStops[0].longitude!, trustedStops[0].latitude!]),
       );
+      // Frame the user together with the route only when they are close; otherwise the route alone.
+      const distance = userPosition ? nearestStopDistanceMeters(userPosition, trustedStops) : null;
+      if (userPosition && distance !== null && distance <= ROUTE_FOCUS_LIMIT_METERS) bounds.extend([userPosition.lng, userPosition.lat]);
       map.fitBounds(bounds, { padding: { top: 90, bottom: 90, left: 70, right: 70 }, maxZoom: 16, duration: 700 });
+    } else if (userPosition) {
+      map.easeTo({ center: [userPosition.lng, userPosition.lat], zoom: Math.max(map.getZoom(), 15), duration: 700 });
     } else {
       map.fitBounds(TWIN_CITY_BOUNDS, { padding: 36 });
     }
-  }, [ready, route]);
+  }, [ready, route, userPosition]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    ensureUserLayers(map);
+    raiseUserLayers(map);
+    const featureCollection: GeoJSON.FeatureCollection = {
+      type: "FeatureCollection",
+      features: userPosition ? [{ type: "Feature", geometry: { type: "Point", coordinates: [userPosition.lng, userPosition.lat] }, properties: accuracyRingRadii(userPosition) ?? {} }] : [],
+    };
+    (map.getSource("user-location") as GeoJSONSource).setData(featureCollection);
+  }, [ready, userPosition]);
+
+  const flyToUser = () => {
+    const map = mapRef.current;
+    if (!map || !userPosition) return;
+    map.easeTo({ center: [userPosition.lng, userPosition.lat], zoom: Math.max(map.getZoom(), 15), duration: 600 });
+  };
 
   useEffect(() => {
     const map = mapRef.current;
@@ -191,5 +286,8 @@ export default function RouteMap({ route, selectedStop, onSelectStop, onMapError
     }
   }, [ready, selectedStop]);
 
-  return <div ref={container} className="map-canvas" aria-label="選中垃圾車路線地圖" />;
+  return <>
+    <div ref={wrapper} className="map-canvas" aria-label="選中垃圾車路線地圖" />
+    {ready && userPosition && <button type="button" className="locate-me-button" onClick={flyToUser} aria-label="回到我的位置" title="回到我的位置"><span aria-hidden="true" /></button>}
+  </>;
 }
