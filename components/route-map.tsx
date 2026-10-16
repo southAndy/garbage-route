@@ -60,27 +60,54 @@ function selectedStopOffset(mapElement: HTMLElement): [number, number] {
   return [0, ((badge?.bottom ?? stage.top) + popup.top) / 2 - centerY];
 }
 
+// One MapLibre instance per page load. The home and route pages each mount
+// their own explorer, so navigating between them unmounts this component;
+// rebuilding the map on every navigation refetches the style and tiles and
+// shows the user a blank map twice. The instance and its DOM node are kept
+// here and re-attached to whichever RouteMap is currently mounted.
+interface CachedMap {
+  map: MapLibreMap;
+  element: HTMLDivElement;
+  loaded: boolean;
+}
+
+const activeHandlers: { onSelectStop: (stop: GarbageStop) => void; getRoute: () => GarbageRoute | null } = {
+  onSelectStop: () => {},
+  getRoute: () => null,
+};
+let cachedMap: CachedMap | null = null;
+
 export default function RouteMap({ route, selectedStop, userPosition = null, onSelectStop, onMapError }: Props) {
-  const container = useRef<HTMLDivElement>(null);
+  const wrapper = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const routeRef = useRef(route);
-  const [ready, setReady] = useState(false);
+  // A re-adopted map that already fired "load" is usable immediately.
+  const [ready, setReady] = useState(() => cachedMap?.loaded ?? false);
 
   useEffect(() => { routeRef.current = route; }, [route]);
 
   useEffect(() => {
-    if (!container.current || mapRef.current) return;
+    const host = wrapper.current;
+    if (!host) return;
+    activeHandlers.onSelectStop = onSelectStop;
+    activeHandlers.getRoute = () => routeRef.current;
+
+    if (cachedMap) {
+      const cached = cachedMap;
+      host.appendChild(cached.element);
+      mapRef.current = cached.map;
+      cached.map.resize();
+      if (!cached.loaded) cached.map.once("load", () => setReady(true));
+      return () => {
+        if (cached.element.parentElement === host) host.removeChild(cached.element);
+        mapRef.current = null;
+      };
+    }
+
     let cancelled = false;
-    let map: MapLibreMap | null = null;
+    let created: CachedMap | null = null;
     let loadTimeout: number | undefined;
     const controller = new AbortController();
-    const mobileViewport = window.matchMedia("(max-width: 760px)");
-    const updateGestures = () => {
-      if (!map) return;
-      if (mobileViewport.matches) map.cooperativeGestures.enable();
-      else map.cooperativeGestures.disable();
-    };
-    mobileViewport.addEventListener("change", updateGestures);
     const initialize = async () => {
       // MapLibre's inferred worker URL is not preserved by Next's client bundlers.
       maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
@@ -94,9 +121,15 @@ export default function RouteMap({ route, selectedStop, userPosition = null, onS
         if (controller.signal.aborted) return;
         console.warn("無法預先處理底圖樣式，改由 MapLibre 直接載入。", error);
       }
-      if (cancelled || !container.current) return;
-      map = new maplibregl.Map({
-        container: container.current,
+      if (cancelled || !wrapper.current) return;
+      const element = document.createElement("div");
+      element.className = "map-canvas-inner";
+      // Inline so MapLibre's own `.maplibregl-map { position: relative }` cannot collapse it.
+      element.style.cssText = "position:absolute;inset:0;";
+      wrapper.current.appendChild(element);
+      const mobileViewport = window.matchMedia("(max-width: 760px)");
+      const map = new maplibregl.Map({
+        container: element,
         style,
         bounds: TWIN_CITY_BOUNDS,
         fitBoundsOptions: { padding: 36 },
@@ -108,26 +141,33 @@ export default function RouteMap({ route, selectedStop, userPosition = null, onS
           "CooperativeGesturesHandler.MacHelpText": "按住 ⌘ 並滾動以縮放地圖",
         },
       });
+      created = { map, element, loaded: false };
+      cachedMap = created;
+      mapRef.current = map;
+      // The map outlives this component, so the viewport listener is never removed.
+      mobileViewport.addEventListener("change", () => {
+        if (mobileViewport.matches) map.cooperativeGestures.enable();
+        else map.cooperativeGestures.disable();
+      });
       loadTimeout = window.setTimeout(() => onMapError(), 15_000);
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
       map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
-      map.on("load", () => { window.clearTimeout(loadTimeout); setReady(true); });
+      map.on("load", () => { window.clearTimeout(loadTimeout); created!.loaded = true; if (!cancelled) setReady(true); });
       map.on("click", "route-stops", (event) => {
         const id = event.features?.[0]?.properties?.id;
-        const stop = routeRef.current?.stops.find((item) => item.id === id);
-        if (stop) onSelectStop(stop);
+        const stop = activeHandlers.getRoute()?.stops.find((item) => item.id === id);
+        if (stop) activeHandlers.onSelectStop(stop);
       });
-      map.on("mouseenter", "route-stops", () => { if (map) map.getCanvas().style.cursor = "pointer"; });
-      map.on("mouseleave", "route-stops", () => { if (map) map.getCanvas().style.cursor = ""; });
-      mapRef.current = map;
+      map.on("mouseenter", "route-stops", () => { map.getCanvas().style.cursor = "pointer"; });
+      map.on("mouseleave", "route-stops", () => { map.getCanvas().style.cursor = ""; });
     };
     void initialize();
     return () => {
       cancelled = true;
       controller.abort();
-      mobileViewport.removeEventListener("change", updateGestures);
       if (loadTimeout) window.clearTimeout(loadTimeout);
-      map?.remove();
+      // Detach rather than destroy: the next RouteMap re-adopts the same map.
+      if (created && created.element.parentElement === host) host.removeChild(created.element);
       mapRef.current = null;
     };
   }, [onMapError, onSelectStop]);
@@ -247,7 +287,7 @@ export default function RouteMap({ route, selectedStop, userPosition = null, onS
   }, [ready, selectedStop]);
 
   return <>
-    <div ref={container} className="map-canvas" aria-label="選中垃圾車路線地圖" />
+    <div ref={wrapper} className="map-canvas" aria-label="選中垃圾車路線地圖" />
     {ready && userPosition && <button type="button" className="locate-me-button" onClick={flyToUser} aria-label="回到我的位置" title="回到我的位置"><span aria-hidden="true" /></button>}
   </>;
 }
