@@ -143,11 +143,9 @@ export default function RouteExplorer({
     if (!viewport) return;
     const root = document.documentElement;
     const update = () => {
-      const keyboardOpen = window.innerHeight - viewport.height > 120;
-      if (!keyboardOpen) { root.style.removeProperty("--viewport-height"); return; }
       root.style.setProperty("--viewport-height", `${Math.round(viewport.height)}px`);
-      // iOS pans the page toward the focused input; keep the layout anchored to the top instead.
-      if (window.scrollY > 0 || viewport.offsetTop > 0) window.scrollTo(0, 0);
+      // Follow Safari's viewport panning instead of fighting it with window.scrollTo.
+      root.style.setProperty("--viewport-top", `${Math.round(viewport.offsetTop)}px`);
     };
     viewport.addEventListener("resize", update);
     viewport.addEventListener("scroll", update);
@@ -156,6 +154,7 @@ export default function RouteExplorer({
       viewport.removeEventListener("resize", update);
       viewport.removeEventListener("scroll", update);
       root.style.removeProperty("--viewport-height");
+      root.style.removeProperty("--viewport-top");
     };
   }, [isMobile]);
 

@@ -231,7 +231,7 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
   body:has(.mobile-survey-invite) .header-actions > .feedback-button { display:none; }
   body:has(.mobile-survey-invite) { --mobile-survey-height:calc(76px + env(safe-area-inset-bottom,0px)); padding-bottom:var(--mobile-survey-height); }
   html:has(.mobile-survey-invite) { scroll-padding-bottom:calc(88px + env(safe-area-inset-bottom,0px)); }
-  /* --viewport-height is set from visualViewport while the on-screen keyboard is open so the bottom sheet stays above it. */
+  /* Track the visible viewport, including changes from the on-screen keyboard. */
   .explorer-viewport { display:flex; flex-direction:column; height:calc(100vh - var(--mobile-survey-height,0px)); height:calc(var(--viewport-height,100dvh) - var(--mobile-survey-height,0px)); }
   .explorer-viewport > .app-header,.explorer-viewport > .breadcrumb { flex-shrink:0; }
   .explorer-viewport > .workspace { flex:1; height:auto; min-height:0; }
@@ -313,6 +313,21 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
   .filters .route-search-label { display:block; margin-top:10px; }
   .filters .select-wrap,.filters .search-wrap { display:block; width:100%; margin-left:0; }
   .sidebar .search-panel-content { height:min(65dvh,calc(var(--viewport-height,100dvh) - 180px)); }
+  /* Give typing the visible viewport; a short bottom sheet clips the stacked filters. */
+  .sidebar .search-panel-content:has(#route-search:focus) {
+    position:fixed;
+    top:calc(var(--viewport-top,0px) + 8px);
+    bottom:auto;
+    height:calc(var(--viewport-height,100dvh) - 16px);
+    max-height:none;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    scroll-padding:12px;
+  }
+  .search-panel-content:has(#route-search:focus) > .filters,
+  .search-panel-content:has(#route-search:focus) > .route-results { flex-shrink:0; }
+  .search-panel-content:has(#route-search:focus) .route-list { overflow:visible; }
+  body:has(#route-search:focus) .mobile-survey-invite { visibility:hidden; }
   .route-search-shortcut { margin-top:4px; }
   .stop-popup { max-height:calc(100% - 290px); }
 }
