@@ -7,7 +7,7 @@ import type { GeoJSONSource, Map as MapLibreMap, StyleSpecification } from "mapl
 import type { GarbageRoute, GarbageStop } from "@/lib/types";
 import { makeMapStyleCompatible } from "@/lib/map-style";
 import { createDisplayGeometries, suspiciousStopIds } from "@/lib/route-display";
-import { nearestStopDistanceMeters, ROUTE_FOCUS_LIMIT_METERS, type UserPosition } from "@/lib/user-location";
+import { accuracyRingRadii, nearestStopDistanceMeters, ROUTE_FOCUS_LIMIT_METERS, type UserPosition } from "@/lib/user-location";
 
 interface Props {
   route: GarbageRoute | null;
@@ -17,12 +17,27 @@ interface Props {
   onMapError: () => void;
 }
 
-const USER_LAYERS = ["user-location-halo", "user-location-dot"] as const;
+const USER_LAYERS = ["user-location-accuracy", "user-location-dot"] as const;
 
 function ensureUserLayers(map: MapLibreMap) {
   if (map.getSource("user-location")) return;
   map.addSource("user-location", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-  map.addLayer({ id: "user-location-halo", type: "circle", source: "user-location", paint: { "circle-radius": 18, "circle-color": "#2f6fd6", "circle-opacity": 0.18 } });
+  // The accuracy ring is a ground-fixed circle: its pixel radius doubles with every zoom level.
+  map.addLayer({
+    id: "user-location-accuracy",
+    type: "circle",
+    source: "user-location",
+    filter: ["has", "r0"],
+    paint: {
+      "circle-radius": ["interpolate", ["exponential", 2], ["zoom"], 0, ["get", "r0"], 22, ["get", "r22"]],
+      "circle-color": "#2f6fd6",
+      "circle-opacity": 0.14,
+      "circle-stroke-color": "#2f6fd6",
+      "circle-stroke-opacity": 0.4,
+      "circle-stroke-width": 1,
+      "circle-pitch-alignment": "map",
+    },
+  });
   map.addLayer({ id: "user-location-dot", type: "circle", source: "user-location", paint: { "circle-radius": 7, "circle-color": "#2f6fd6", "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 } });
 }
 
@@ -203,7 +218,7 @@ export default function RouteMap({ route, selectedStop, userPosition = null, onS
     raiseUserLayers(map);
     const featureCollection: GeoJSON.FeatureCollection = {
       type: "FeatureCollection",
-      features: userPosition ? [{ type: "Feature", geometry: { type: "Point", coordinates: [userPosition.lng, userPosition.lat] }, properties: {} }] : [],
+      features: userPosition ? [{ type: "Feature", geometry: { type: "Point", coordinates: [userPosition.lng, userPosition.lat] }, properties: accuracyRingRadii(userPosition) ?? {} }] : [],
     };
     (map.getSource("user-location") as GeoJSONSource).setData(featureCollection);
   }, [ready, userPosition]);

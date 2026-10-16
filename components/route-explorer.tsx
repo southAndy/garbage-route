@@ -14,11 +14,11 @@ import StopScheduleTable from "./stop-schedule-table";
 import SiteHeader from "./site-header";
 import FeedbackButton from "./feedback-button";
 import { displayTime, scheduleText } from "@/lib/schedule-display";
-import { GEOLOCATION_OPTIONS, locateErrorState, locateMessage, queryGeolocationPermission, roundForRequest, type GeolocationPermission, type LocateState } from "@/lib/geolocation";
+import { formatDistance, GEOLOCATION_OPTIONS, locateErrorState, locateMessage, queryGeolocationPermission, roundForRequest, type GeolocationPermission, type LocateState } from "@/lib/geolocation";
 import type { NearbyResult } from "@/lib/nearby-search";
 import NearbyRouteCard from "./nearby-route-card";
 import { partitionNearbyRoutes, taipeiClock } from "@/lib/stop-timing";
-import { clearLocationSession, getLocationSession, setLocationSession, useLocationSession } from "@/lib/user-location";
+import { ACCURACY_WARNING_METERS, clearLocationSession, getLocationSession, setLocationSession, useLocationSession } from "@/lib/user-location";
 
 const RouteMap = dynamic(() => import("./route-map"), { ssr: false, loading: () => <div className="map-loading"><span className="spinner" />正在準備地圖…</div> });
 
@@ -333,6 +333,7 @@ export default function RouteExplorer({
             {nearby ? <>
               <div className="results-heading"><div className="step-label"><span>02</span> 附近的路線</div><button type="button" className="clear-nearby" onClick={clearNearby}>清除定位</button></div>
               <p className="nearby-summary">你附近 {nearby.radius >= 1000 ? "1 公里" : `${nearby.radius} 公尺`}內有 {nearby.routes.length} 條路線{nearby.resolved ? `，位置約在${CITY_NAMES[nearby.resolved.city]}${nearby.resolved.district}` : ""}。{nearby.expanded && "500 公尺內沒有站點，已擴大到 1 公里。"}</p>
+              {userPosition?.accuracy != null && userPosition.accuracy > ACCURACY_WARNING_METERS && <p className="nearby-accuracy-warning" role="status">定位誤差約 {formatDistance(userPosition.accuracy)}，附近結果僅供參考，建議改用路名搜尋確認。</p>}
               {nearby.routes.length === 0 || !nearbyGroups ? <div className="empty-state"><span>1 公里內沒有垃圾車站點</span><p>請改用行政區與路名搜尋</p>{nearby.resolved && <FeedbackButton label="附近應該有站點？告訴我們" context={{ entry: "empty_nearby", city: nearby.resolved.city, district: nearby.resolved.district, radius: String(nearby.radius) }} summary={`${CITY_NAMES[nearby.resolved.city]}・${nearby.resolved.district}・附近 ${nearby.radius} 公尺無結果`} />}</div> : (
                 <div className="route-list">
                   {nearbyGroups.upcoming.length === 0 && <p className="nearby-all-passed">附近路線今天的表定時間都已過，或今日不收。以下列表可供規劃其他日子。</p>}
