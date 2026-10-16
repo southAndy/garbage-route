@@ -1,5 +1,5 @@
 export type FeedbackContext = {
-  entry: "general" | "stop" | "empty_search" | "stop_outcome";
+  entry: "general" | "stop" | "empty_search" | "empty_nearby" | "stop_outcome";
   outcome?: "found" | "not_found";
   city?: string;
   district?: string;
@@ -7,6 +7,8 @@ export type FeedbackContext = {
   stop_id?: string;
   source_synced_at?: string;
   query?: string;
+  /** Search radius in metres for nearby lookups; never the coordinates themselves. */
+  radius?: string;
 };
 
 export function feedbackUrls(formUrl: string | undefined, context: FeedbackContext) {

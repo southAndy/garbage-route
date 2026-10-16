@@ -14,6 +14,9 @@ import StopScheduleTable from "./stop-schedule-table";
 import SiteHeader from "./site-header";
 import FeedbackButton from "./feedback-button";
 import { displayTime, scheduleText } from "@/lib/schedule-display";
+import { GEOLOCATION_OPTIONS, locateErrorState, locateMessage, queryGeolocationPermission, roundForRequest, type GeolocationPermission, type LocateState } from "@/lib/geolocation";
+import type { NearbyResult } from "@/lib/nearby-search";
+import NearbyRouteCard from "./nearby-route-card";
 
 const RouteMap = dynamic(() => import("./route-map"), { ssr: false, loading: () => <div className="map-loading"><span className="spinner" />正在準備地圖…</div> });
 
@@ -80,6 +83,31 @@ export default function RouteExplorer({
   const [mapFailed, setMapFailed] = useState(false);
   // Keep the mobile map visible on entry; users open the search sheet explicitly.
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+  // Nearby mode replaces the district result list until the user types or changes area.
+  const [nearby, setNearby] = useState<NearbyResult | null>(null);
+  const [locateState, setLocateState] = useState<LocateState>("idle");
+  const [geoPermission, setGeoPermission] = useState<GeolocationPermission>("prompt");
+  const [userAgent, setUserAgent] = useState("");
+
+  useEffect(() => {
+    let status: PermissionStatus | null = null;
+    let active = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setUserAgent(navigator.userAgent);
+    queryGeolocationPermission().then((state) => { if (active) setGeoPermission(state); });
+    // Track changes so the button recovers as soon as the user re-allows location in browser settings.
+    if (typeof navigator !== "undefined" && "permissions" in navigator) {
+      navigator.permissions.query({ name: "geolocation" }).then((result) => {
+        if (!active) return;
+        status = result;
+        status.onchange = () => {
+          setGeoPermission(result.state);
+          if (result.state !== "denied") setLocateState((current) => current === "denied" ? "idle" : current);
+        };
+      }).catch(() => {});
+    }
+    return () => { active = false; if (status) status.onchange = null; };
+  }, []);
 
   useEffect(() => {
     if (!isMobile || !mobilePanelOpen) return;
@@ -136,8 +164,55 @@ export default function RouteExplorer({
     return () => { active = false; };
   }, [city, district, debouncedQuery]);
 
+  const clearNearby = useCallback(() => {
+    setNearby(null);
+    setLocateState((current) => current === "ready" ? "idle" : current);
+  }, []);
+
+  const applyResolvedArea = (nextCity: CityCode, nextDistrict: string) => {
+    if (nextCity !== city) {
+      setLoadingDistricts(true); setDistrictsFailed(false);
+      setDistricts([]); setCity(nextCity);
+    }
+    setDistrict(nextDistrict);
+    setRoute(null); setSelectedStop(null); setError("");
+    // Only the inferred area goes into the URL; coordinates never do.
+    router.replace(`/?${new URLSearchParams({ city: nextCity, district: nextDistrict })}`);
+  };
+
+  const locate = async () => {
+    if (locateState === "locating") return;
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) { setLocateState("unsupported"); return; }
+    const permission = await queryGeolocationPermission();
+    setGeoPermission(permission);
+    if (permission === "denied") { setLocateState("denied"); return; }
+    setLocateState("locating");
+    setQuery("");
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      const lat = roundForRequest(position.coords.latitude);
+      const lng = roundForRequest(position.coords.longitude);
+      try {
+        const response = await fetch(`/api/v1/nearby?${new URLSearchParams({ lat: String(lat), lng: String(lng) })}`);
+        if (!response.ok) throw new Error("Nearby request failed");
+        const result = await response.json();
+        const data = result.data as NearbyResult;
+        if (!data.resolved) { setNearby(null); setLocateState("outOfArea"); return; }
+        applyResolvedArea(data.resolved.city, data.resolved.district);
+        setNearby(data);
+        setLocateState("ready");
+      } catch {
+        setLocateState("failed");
+      }
+    }, (positionError) => {
+      const next = locateErrorState(positionError.code);
+      if (next === "denied") setGeoPermission("denied");
+      setLocateState(next);
+    }, GEOLOCATION_OPTIONS);
+  };
+
   const selectCity = (nextCity: CityCode) => {
     if (nextCity === city) return;
+    clearNearby();
     setLoadingDistricts(true); setDistrictsFailed(false);
     setLoadingRoutes(true); setRoutes([]); setDistricts([]);
     setCity(nextCity); setDistrict(""); setRoute(null); setSelectedStop(null); setQuery(""); setError("");
@@ -145,6 +220,7 @@ export default function RouteExplorer({
   };
 
   const selectDistrict = (nextDistrict: string) => {
+    clearNearby();
     setDistrict(nextDistrict); setRoute(null); setSelectedStop(null); setError("");
     const params = new URLSearchParams({ city, district: nextDistrict });
     if (query) params.set("q", query);
@@ -223,10 +299,30 @@ export default function RouteExplorer({
               </select>
             </div>
             <label className="field-label route-search-label" htmlFor="route-search">搜尋{district || CITY_NAMES[city]}的路名或停靠點</label>
-            <div className="search-wrap"><span aria-hidden="true">⌕</span><input ref={searchInputRef} id="route-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={district === "士林區" ? "例如：延平北路、社子" : "輸入路名、地點或路線名稱"} /></div>
+            <div className="search-wrap"><span aria-hidden="true">⌕</span><input ref={searchInputRef} id="route-search" value={query} onChange={(event) => { if (nearby) clearNearby(); setQuery(event.target.value); }} placeholder={district === "士林區" ? "例如：延平北路、社子" : "輸入路名、地點或路線名稱"} /></div>
+            <div className="locate-row">
+              <button type="button" className="locate-button" onClick={locate} disabled={locateState === "locating" || geoPermission === "unsupported"} aria-busy={locateState === "locating"} aria-describedby="locate-hint">
+                <span aria-hidden="true">{locateState === "locating" ? <span className="spinner locate-spinner" /> : "◎"}</span>
+                {locateState === "locating" ? "定位中…" : "使用目前位置"}
+              </button>
+              <small id="locate-hint">僅用於查詢附近路線，不會儲存位置</small>
+            </div>
+            {locateMessage(locateState, userAgent) && <p className={`locate-message ${locateState === "denied" ? "is-blocked" : ""}`} role="status">{locateMessage(locateState, userAgent)}</p>}
           </div>
 
           <div className="route-results">
+            {nearby ? <>
+              <div className="results-heading"><div className="step-label"><span>02</span> 附近的路線</div><button type="button" className="clear-nearby" onClick={clearNearby}>清除定位</button></div>
+              <p className="nearby-summary">你附近 {nearby.radius >= 1000 ? "1 公里" : `${nearby.radius} 公尺`}內有 {nearby.routes.length} 條路線{nearby.resolved ? `，位置約在${CITY_NAMES[nearby.resolved.city]}${nearby.resolved.district}` : ""}。{nearby.expanded && "500 公尺內沒有站點，已擴大到 1 公里。"}</p>
+              {nearby.routes.length === 0 ? <div className="empty-state"><span>1 公里內沒有垃圾車站點</span><p>請改用行政區與路名搜尋</p>{nearby.resolved && <FeedbackButton label="附近應該有站點？告訴我們" context={{ entry: "empty_nearby", city: nearby.resolved.city, district: nearby.resolved.district, radius: String(nearby.radius) }} summary={`${CITY_NAMES[nearby.resolved.city]}・${nearby.resolved.district}・附近 ${nearby.radius} 公尺無結果`} />}</div> : (
+                <div className="route-list">
+                  {nearby.routes.map((item) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card nearby-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); selectRoute(item); }}>
+                    <NearbyRouteCard item={item} />
+                  </Link>)}
+                  <p className="results-note">以上為表定清運時間與站點距離，非車輛即時位置。</p>
+                </div>
+              )}
+            </> : <>
             <div className="results-heading"><div className="step-label"><span>02</span> 選擇路線</div><small>{loadingRoutes ? "查詢中…" : `${routes.length} 條結果`}</small></div>
             {error && <div className="alert" role="alert">{error}</div>}
             {loadingRoutes ? <div className="routes-loading" role="status"><span className="spinner" aria-hidden="true" /><span>正在載入路線資料…</span></div> : routes.length === 0 ? !error && <div className="empty-state"><span>沒有相符路線</span><p>試試其他關鍵字或行政區</p>{district && <FeedbackButton label="找不到要找的地點？告訴我們" context={{ entry: "empty_search", city, district, query: debouncedQuery }} summary={`${CITY_NAMES[city]}・${district}${debouncedQuery ? `・搜尋：${debouncedQuery}` : ""}`} />}</div> : (
@@ -241,6 +337,7 @@ export default function RouteExplorer({
                 </Link>)}
               </div>
             )}
+            </>}
           </div>
           </>}
           </div>
