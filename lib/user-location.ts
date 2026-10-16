@@ -10,10 +10,10 @@ export interface UserPosition {
   locatedAt: number;
 }
 
-/** One "use my location" result: the fix for the map marker and the nearby routes it produced. */
+/** A location fix, optionally accompanied by a nearby-route search result. */
 export interface LocationSession {
   position: UserPosition;
-  nearby: NearbyResult;
+  nearby: NearbyResult | null;
 }
 
 /** Show the user's dot together with a route only when they are this close to it; otherwise frame the route alone. */
