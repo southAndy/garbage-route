@@ -9,6 +9,8 @@ import { makeMapStyleCompatible } from "@/lib/map-style";
 import { createDisplayGeometries, suspiciousStopIds } from "@/lib/route-display";
 import { accuracyRingRadii, nearestStopDistanceMeters, ROUTE_FOCUS_LIMIT_METERS, type UserPosition } from "@/lib/user-location";
 
+import MapLocationControl from "./map-location-control";
+
 interface Props {
   route: GarbageRoute | null;
   selectedStop: GarbageStop | null;
@@ -277,6 +279,6 @@ export default function RouteMap({ route, selectedStop, userPosition = null, onS
 
   return <>
     <div ref={wrapper} className="map-canvas" aria-label="選中垃圾車路線地圖" />
-    {ready && userPosition && <button type="button" className="locate-me-button" onClick={flyToUser} aria-label="回到我的位置" title="回到我的位置"><span aria-hidden="true" /></button>}
+    {ready && (route || userPosition) && <MapLocationControl route={route} onFocusPosition={flyToUser} />}
   </>;
 }

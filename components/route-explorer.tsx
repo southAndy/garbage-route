@@ -17,7 +17,6 @@ import { displayTime, scheduleText } from "@/lib/schedule-display";
 import { formatDistance, GEOLOCATION_OPTIONS, locateErrorState, locateMessage, queryGeolocationPermission, roundForRequest, type GeolocationPermission, type LocateState } from "@/lib/geolocation";
 import type { NearbyResult } from "@/lib/nearby-search";
 import NearbyRouteCard from "./nearby-route-card";
-import MapLocationControl from "./map-location-control";
 import { partitionNearbyRoutes, taipeiClock } from "@/lib/stop-timing";
 import { ACCURACY_WARNING_METERS, clearLocationSession, getLocationSession, setLocationSession, useLocationSession } from "@/lib/user-location";
 
@@ -396,7 +395,6 @@ export default function RouteExplorer({
         </aside>
 
         <section className="map-stage" ref={mapStageRef} tabIndex={-1} aria-label="路線地圖與所選停靠點">
-          {route && <MapLocationControl route={route} />}
           {mapFailed ? <div className="map-fallback"><strong>地圖目前無法載入</strong><p>仍可從路線面板查看完整停靠點。</p><button onClick={() => { setMapFailed(false); window.location.reload(); }}>重新載入</button></div> : <RouteMap route={route} selectedStop={selectedStop} userPosition={userPosition} onSelectStop={chooseStop} onMapError={handleMapError} />}
           {!route && !invalidSharedPath && <div className="map-intro"><p className="eyebrow">TAIPEI · NEW TAIPEI</p><h1>台北、新北<br />垃圾車時間與路線查詢</h1><p>今晚的垃圾車會停在哪裡？<br />選擇城市、行政區與路線，查看每一站的表定時間。</p><div className="intro-steps"><span><b>1</b>選城市</span><i>→</i><span><b>2</b>選行政區</span><i>→</i><span><b>3</b>看路線</span></div><button type="button" className="intro-search-button" onClick={openRouteSearch} aria-controls="route-search-panel">搜尋路名或地點 →</button></div>}
           {route && validCount === 0 && <div className="map-warning">此路線暫無可用地圖位置，請查看文字停靠點列表。</div>}
