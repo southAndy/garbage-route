@@ -82,7 +82,7 @@ describe("searchNearby", () => {
     expect(near.nearby.count).toBe(4);
     expect(near.nearby.nearestDistanceMeters).toBe(111);
     expect(near.nearby.stops.map((item) => item.stopId)).toEqual(["近線-stop-4", "近線-stop-2", "近線-stop-1"]);
-    expect(near.nearby.stops[0]).toEqual({ stopId: "近線-stop-4", name: "近線 第 4 站", scheduledTime: "19:04", serviceDayOffset: 0, distanceMeters: 111 });
+    expect(near.nearby.stops[0]).toEqual({ stopId: "近線-stop-4", name: "近線 第 4 站", scheduledTime: "19:04", serviceDayOffset: 0, distanceMeters: 111, serviceDays: null });
   });
 
   it("相關站點的時間範圍依路線順序取首末站，而非全線", () => {
@@ -91,6 +91,20 @@ describe("searchNearby", () => {
     expect(near.nearby.lastTime).toBe("19:05");
     expect(near.firstArrivalTime).toBe("19:01");
     expect(near.lastArrivalTime).toBe("19:05");
+    expect(near.nearby.firstTimeOffset).toBe(0);
+    expect(near.nearby.lastTimeOffset).toBe(0);
+  });
+
+  it("清運日取範圍內站點的聯集，沒有排程時為 null", () => {
+    const monWedFri = [false, true, false, true, false, true, false];
+    const tue = [false, false, true, false, false, false, false];
+    const withSchedule = createNearbyIndex([
+      route("排程線", [stop("排程線", 1, 0.001, 0, { schedule: { garbage: monWedFri, recycling: monWedFri, foodScraps: monWedFri } }), stop("排程線", 2, 0.002, 0, { schedule: { garbage: tue, recycling: tue, foodScraps: tue } }), stop("排程線", 3, 0.003, 0)]),
+    ]);
+    const result = searchNearby(withSchedule, ORIGIN, 500).routes[0];
+    expect(result.nearby.serviceDays).toEqual([false, true, true, true, false, true, false]);
+    expect(result.nearby.stops.find((item) => item.stopId === "排程線-stop-3")?.serviceDays).toBeNull();
+    expect(searchNearby(index, ORIGIN, 500).routes[0].nearby.serviceDays).toBeNull();
   });
 
   it("座標無效或被標記為可疑的站點不會出現", () => {

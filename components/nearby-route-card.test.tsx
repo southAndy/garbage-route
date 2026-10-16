@@ -9,10 +9,11 @@ const item: NearbyRoute = {
   nearby: {
     count: 5, nearestDistanceMeters: 22, firstTime: "19:10", lastTime: "19:25",
     stops: [
-      { stopId: "s1", name: "文化路 20 號附近", scheduledTime: "19:10", serviceDayOffset: 0, distanceMeters: 22 },
-      { stopId: "s2", name: "文化路 80 號附近", scheduledTime: "19:18", serviceDayOffset: 0, distanceMeters: 140 },
-      { stopId: "s3", name: "文化路 120 號附近", scheduledTime: "00:05", serviceDayOffset: 1, distanceMeters: 1200 },
+      { stopId: "s1", name: "文化路 20 號附近", scheduledTime: "19:10", serviceDayOffset: 0, distanceMeters: 22, serviceDays: null },
+      { stopId: "s2", name: "文化路 80 號附近", scheduledTime: "19:18", serviceDayOffset: 0, distanceMeters: 140, serviceDays: null },
+      { stopId: "s3", name: "文化路 120 號附近", scheduledTime: "00:05", serviceDayOffset: 1, distanceMeters: 1200, serviceDays: null },
     ],
+    firstTimeOffset: 0, lastTimeOffset: 1, serviceDays: null,
   },
 };
 
@@ -23,6 +24,17 @@ describe("NearbyRouteCard", () => {
       expect(html).toContain(text);
     }
     expect(html).not.toContain("即將");
+  });
+
+  it("給定時鐘時標示已過表定時間的站點，沒有時鐘時不標示", () => {
+    const clock = { weekday: 4, minutes: 19 * 60 + 15 };
+    const html = renderToStaticMarkup(<NearbyRouteCard item={item} clock={clock} timing={{ status: "upcoming", minutesUntilNext: 3 }} />);
+    expect(html).toContain("已過表定時間");
+    expect(html).toContain('class="status-passed"');
+    expect((html.match(/已過表定時間/g) ?? []).length).toBe(1);
+    const passedRoute = renderToStaticMarkup(<NearbyRouteCard item={item} clock={{ weekday: 4, minutes: 23 * 60 }} timing={{ status: "passed", minutesUntilNext: null }} />);
+    expect(passedRoute).toContain('class="stop-status status-passed"');
+    expect(renderToStaticMarkup(<NearbyRouteCard item={item} />)).not.toContain("已過表定時間");
   });
 
   it("只有一站時不顯示時間區間", () => {

@@ -25,6 +25,8 @@ export interface NearbyStop {
   scheduledTime: string | null;
   serviceDayOffset: number;
   distanceMeters: number;
+  /** Weekday flags (index 0 = Sunday) for garbage collection at this stop; null when the source has none. */
+  serviceDays: boolean[] | null;
 }
 
 export interface NearbyRoute extends RouteSummary {
@@ -36,7 +38,11 @@ export interface NearbyRoute extends RouteSummary {
     nearestDistanceMeters: number;
     /** Scheduled span over the in-radius stops only, in route order. */
     firstTime: string | null;
+    firstTimeOffset: number;
     lastTime: string | null;
+    lastTimeOffset: number;
+    /** Union of garbage-collection weekdays across in-radius stops; null when none has a schedule. */
+    serviceDays: boolean[] | null;
   };
 }
 
@@ -116,6 +122,12 @@ function resolveArea(nearest: Array<{ entry: IndexedStop; distance: number }>): 
   return winner?.area ?? null;
 }
 
+function unionServiceDays(stops: GarbageStop[]): boolean[] | null {
+  const scheduled = stops.filter((stop) => stop.schedule);
+  if (scheduled.length === 0) return null;
+  return Array.from({ length: 7 }, (_, day) => scheduled.some((stop) => stop.schedule?.garbage[day]));
+}
+
 function groupByRoute(hits: Array<{ entry: IndexedStop; distance: number }>): NearbyRoute[] {
   const byRoute = new Map<string, { route: GarbageRoute; hits: Array<{ entry: IndexedStop; distance: number }> }>();
   for (const hit of hits) {
@@ -136,10 +148,14 @@ function groupByRoute(hits: Array<{ entry: IndexedStop; distance: number }>): Ne
           scheduledTime: entry.stop.arrivalTime,
           serviceDayOffset: entry.stop.serviceDayOffset,
           distanceMeters: Math.round(distance),
+          serviceDays: entry.stop.schedule?.garbage ?? null,
         })),
         nearestDistanceMeters: Math.round(byDistance[0].distance),
         firstTime: bySequence[0]?.entry.stop.arrivalTime ?? null,
+        firstTimeOffset: bySequence[0]?.entry.stop.serviceDayOffset ?? 0,
         lastTime: bySequence.at(-1)?.entry.stop.arrivalTime ?? null,
+        lastTimeOffset: bySequence.at(-1)?.entry.stop.serviceDayOffset ?? 0,
+        serviceDays: unionServiceDays(routeHits.map(({ entry }) => entry.stop)),
       },
     };
   }).sort((a, b) => a.nearby.nearestDistanceMeters - b.nearby.nearestDistanceMeters || a.routeName.localeCompare(b.routeName, "zh-Hant"));

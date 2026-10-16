@@ -17,6 +17,7 @@ import { displayTime, scheduleText } from "@/lib/schedule-display";
 import { GEOLOCATION_OPTIONS, locateErrorState, locateMessage, queryGeolocationPermission, roundForRequest, type GeolocationPermission, type LocateState } from "@/lib/geolocation";
 import type { NearbyResult } from "@/lib/nearby-search";
 import NearbyRouteCard from "./nearby-route-card";
+import { partitionNearbyRoutes, taipeiClock } from "@/lib/stop-timing";
 
 const RouteMap = dynamic(() => import("./route-map"), { ssr: false, loading: () => <div className="map-loading"><span className="spinner" />正在準備地圖…</div> });
 
@@ -88,6 +89,13 @@ export default function RouteExplorer({
   const [locateState, setLocateState] = useState<LocateState>("idle");
   const [geoPermission, setGeoPermission] = useState<GeolocationPermission>("prompt");
   const [userAgent, setUserAgent] = useState("");
+  // Re-render once a minute while nearby results are showing so "already passed" stays current.
+  const [clockTick, setClockTick] = useState(0);
+  useEffect(() => {
+    if (!nearby) return;
+    const timer = window.setInterval(() => setClockTick((tick) => tick + 1), 60_000);
+    return () => window.clearInterval(timer);
+  }, [nearby]);
 
   useEffect(() => {
     let status: PermissionStatus | null = null;
@@ -267,6 +275,9 @@ export default function RouteExplorer({
     searchInputRef.current?.select();
   };
   const handleMapError = useCallback(() => setMapFailed(true), []);
+  // Nearby mode only exists after a click, so reading the clock here never runs on the server.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const nearbyGroups = useMemo(() => nearby ? { clock: taipeiClock(), ...partitionNearbyRoutes(nearby.routes, taipeiClock()) } : null, [nearby, clockTick]);
   const validCount = useMemo(() => route?.stops.filter((stop) => stop.coordinateStatus === "valid").length ?? 0, [route]);
   const suspiciousIds = useMemo(() => suspiciousStopIds(route), [route]);
   const selectedWarning = useMemo(() => warningForStop(route, selectedStop), [route, selectedStop]);
@@ -314,12 +325,19 @@ export default function RouteExplorer({
             {nearby ? <>
               <div className="results-heading"><div className="step-label"><span>02</span> 附近的路線</div><button type="button" className="clear-nearby" onClick={clearNearby}>清除定位</button></div>
               <p className="nearby-summary">你附近 {nearby.radius >= 1000 ? "1 公里" : `${nearby.radius} 公尺`}內有 {nearby.routes.length} 條路線{nearby.resolved ? `，位置約在${CITY_NAMES[nearby.resolved.city]}${nearby.resolved.district}` : ""}。{nearby.expanded && "500 公尺內沒有站點，已擴大到 1 公里。"}</p>
-              {nearby.routes.length === 0 ? <div className="empty-state"><span>1 公里內沒有垃圾車站點</span><p>請改用行政區與路名搜尋</p>{nearby.resolved && <FeedbackButton label="附近應該有站點？告訴我們" context={{ entry: "empty_nearby", city: nearby.resolved.city, district: nearby.resolved.district, radius: String(nearby.radius) }} summary={`${CITY_NAMES[nearby.resolved.city]}・${nearby.resolved.district}・附近 ${nearby.radius} 公尺無結果`} />}</div> : (
+              {nearby.routes.length === 0 || !nearbyGroups ? <div className="empty-state"><span>1 公里內沒有垃圾車站點</span><p>請改用行政區與路名搜尋</p>{nearby.resolved && <FeedbackButton label="附近應該有站點？告訴我們" context={{ entry: "empty_nearby", city: nearby.resolved.city, district: nearby.resolved.district, radius: String(nearby.radius) }} summary={`${CITY_NAMES[nearby.resolved.city]}・${nearby.resolved.district}・附近 ${nearby.radius} 公尺無結果`} />}</div> : (
                 <div className="route-list">
-                  {nearby.routes.map((item) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card nearby-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); selectRoute(item); }}>
-                    <NearbyRouteCard item={item} />
+                  {nearbyGroups.upcoming.length === 0 && <p className="nearby-all-passed">附近路線今天的表定時間都已過，或今日不收。以下列表可供規劃其他日子。</p>}
+                  {nearbyGroups.upcoming.map(({ route: item, timing }) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card nearby-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); selectRoute(item); }}>
+                    <NearbyRouteCard item={item} clock={nearbyGroups.clock} timing={timing} />
                   </Link>)}
-                  <p className="results-note">以上為表定清運時間與站點距離，非車輛即時位置。</p>
+                  {nearbyGroups.later.length > 0 && <details className="nearby-later" open={nearbyGroups.upcoming.length === 0}>
+                    <summary>今天已過或不收的 {nearbyGroups.later.length} 條路線</summary>
+                    {nearbyGroups.later.map(({ route: item, timing }) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card nearby-card is-later ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); selectRoute(item); }}>
+                      <NearbyRouteCard item={item} clock={nearbyGroups.clock} timing={timing} />
+                    </Link>)}
+                  </details>}
+                  <p className="results-note">以上為表定清運時間與站點距離，非車輛即時位置。「已過表定時間」不代表車輛已離開，假日或臨時調整請以清潔隊公告為準。</p>
                 </div>
               )}
             </> : <>
