@@ -213,6 +213,10 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 
 /* Contextual feedback */
 .header-actions { display:flex; align-items:center; gap:16px; }
+.browse-districts-link { display:inline-flex; align-items:center; min-height:44px; color:var(--green); font-size:13px; font-weight:600; white-space:nowrap; text-underline-offset:4px; }
+.district-browser .district-index { margin-top:28px; padding:24px 0 0; }
+.district-browser .district-index-grid { grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr)); }
+.district-browser .district-index li a { min-height:44px; align-items:center; }
 .feedback-button { padding:9px 12px; min-height:44px; color:var(--green); background:transparent; border:1px solid var(--line); border-radius:8px; font-size:13px; cursor:pointer; }
 .feedback-button:hover { background:#eef5f0; border-color:var(--green); }
 .stop-popup > .feedback-button { margin-top:10px; }
@@ -228,6 +232,7 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 .mobile-survey-invite { display:none; }
 @media (max-width:760px) {
   .header-actions { gap:8px; }
+  .header-actions .header-note { display:none; }
   .header-actions > .feedback-button { padding:8px; font-size:12px; }
   body:has(.mobile-survey-invite) .header-actions > .feedback-button { display:none; }
   body:has(.mobile-survey-invite) { --mobile-survey-height:calc(76px + env(safe-area-inset-bottom,0px)); padding-bottom:var(--mobile-survey-height); }

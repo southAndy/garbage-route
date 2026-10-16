@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import DistrictIndex from "@/components/district-index";
 import RouteExplorer from "@/components/route-explorer";
 import JsonLd from "@/components/json-ld";
 import { siteUrl } from "@/lib/site-url";
@@ -31,9 +30,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         name: "清運地圖",
         url: `${siteUrl}/`,
       }} />
-      <RouteExplorer initialCity={initialCity} initialDistrict={params.district ?? ""} initialQuery={params.q ?? ""}>
-        <DistrictIndex />
-      </RouteExplorer>
+      <RouteExplorer initialCity={initialCity} initialDistrict={params.district ?? ""} initialQuery={params.q ?? ""} />
     </>
   );
 }

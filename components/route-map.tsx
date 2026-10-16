@@ -127,28 +127,17 @@ export default function RouteMap({ route, selectedStop, userPosition = null, onS
       // Inline so MapLibre's own `.maplibregl-map { position: relative }` cannot collapse it.
       element.style.cssText = "position:absolute;inset:0;";
       wrapper.current.appendChild(element);
-      const mobileViewport = window.matchMedia("(max-width: 760px)");
       const map = new maplibregl.Map({
         container: element,
         style,
         bounds: TWIN_CITY_BOUNDS,
         fitBoundsOptions: { padding: 36 },
         attributionControl: false,
-        cooperativeGestures: mobileViewport.matches,
-        locale: {
-          "CooperativeGesturesHandler.MobileHelpText": "使用雙指移動地圖，單指滑動頁面",
-          "CooperativeGesturesHandler.WindowsHelpText": "按住 Ctrl 並滾動以縮放地圖",
-          "CooperativeGesturesHandler.MacHelpText": "按住 ⌘ 並滾動以縮放地圖",
-        },
+        cooperativeGestures: false,
       });
       created = { map, element, loaded: false };
       cachedMap = created;
       mapRef.current = map;
-      // The map outlives this component, so the viewport listener is never removed.
-      mobileViewport.addEventListener("change", () => {
-        if (mobileViewport.matches) map.cooperativeGestures.enable();
-        else map.cooperativeGestures.disable();
-      });
       loadTimeout = window.setTimeout(() => onMapError(), 15_000);
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
       map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
