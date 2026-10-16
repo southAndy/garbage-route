@@ -2,8 +2,10 @@
 * { box-sizing:border-box; }
 html, body { margin:0; min-height:100%; background:var(--cream); color:var(--ink); font-family:var(--font-sans),"Noto Sans TC",system-ui,sans-serif; }
 button,input,select { font:inherit; }
-button,a { -webkit-tap-highlight-color:transparent; }
+button,a,input,select { -webkit-tap-highlight-color:transparent; }
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible { outline:3px solid rgba(245,184,64,.8); outline-offset:2px; }
+/* Touch devices: text inputs always match :focus-visible, so tapping the search box flashed the big ring. Keep a quiet border change instead. */
+@media (pointer:coarse) { input:focus-visible,select:focus-visible { outline:none; border-color:var(--green); } }
 
 .app-shell { min-height:100vh; }
 .app-header { height:76px; padding:0 28px; display:flex; align-items:center; justify-content:space-between; background:var(--paper); border-bottom:1px solid var(--line); position:relative; z-index:20; }
