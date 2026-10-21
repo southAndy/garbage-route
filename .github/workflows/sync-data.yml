@@ -46,7 +46,7 @@ jobs:
       - name: Verify production build before publishing data
         run: npm run build
         env:
-          SITE_URL: https://garbage-route.vercel.app
+          SITE_URL: https://trash.andywalking.tw
           VERCEL_ENV: production
 
       - name: Commit the validated snapshot and check time
