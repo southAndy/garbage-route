@@ -6,8 +6,12 @@
 
 ## 本機執行
 
+專案統一使用 Node.js 24.x 與隨附的 npm。使用 nvm 時先執行以下指令；其他版本管理工具也請切換至 Node.js 24。GitHub Actions 讀取 `.nvmrc`，Vercel 下一次部署會採用 `package.json` 的 `engines.node` 設定，覆蓋後台的 Node 版本選項。
+
 ```bash
-npm install
+nvm install
+nvm use
+npm ci
 cp .env.example .env.local
 npm run dev
 ```
