@@ -1,5 +1,7 @@
 "use client";
 
+import TrackedLocationButton from "./tracked-location-button";
+
 import { useEffect, useId, useRef, useState } from "react";
 import type { GarbageRoute } from "../lib/types";
 import { formatDistance, GEOLOCATION_OPTIONS, locateErrorState, locateMessage, type LocateState } from "../lib/geolocation";
@@ -50,17 +52,17 @@ export default function MapLocationControl({ route, onFocusPosition }: { route: 
   const label = state === "locating" ? "定位中…" : position ? "回到我的位置" : "定位我的位置";
 
   return <>
-    <button ref={trigger} type="button" className={`locate-me-button${position ? " has-position" : ""}`} aria-label={label} title={label} aria-expanded={expanded} aria-controls={panelId} disabled={state === "locating"} aria-busy={state === "locating"} onClick={() => {
+    <TrackedLocationButton source="map" ref={trigger} type="button" className={`locate-me-button${position ? " has-position" : ""}`} aria-label={label} title={label} aria-expanded={expanded} aria-controls={panelId} disabled={state === "locating"} aria-busy={state === "locating"} onClick={() => {
       if (position) { onFocusPosition?.(); setExpanded((value) => !value); }
       else locate();
-    }}><span aria-hidden="true" /></button>
+    }}><span aria-hidden="true" /></TrackedLocationButton>
     {expanded && <div id={panelId} className="map-location-control" onKeyDown={(event) => {
       if (event.key === "Escape") { event.stopPropagation(); collapse(); }
     }}>
     <div className="map-location-actions">
-      <button type="button" className="locate-button" onClick={locate} disabled={state === "locating"} aria-busy={state === "locating"}>
+      <TrackedLocationButton source="map_retry" type="button" className="locate-button" onClick={locate} disabled={state === "locating"} aria-busy={state === "locating"}>
         {state === "locating" ? "定位中…" : position ? "更新我的位置" : "重新定位"}
-      </button>
+      </TrackedLocationButton>
       {position && expanded && <button type="button" className="clear-nearby" onClick={() => {
         request.current += 1; pending.current = false;
         clearLocationSession(); setState("idle"); collapse();

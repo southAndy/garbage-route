@@ -1,5 +1,7 @@
 "use client";
 
+import TrackedLocationButton from "./tracked-location-button";
+
 import dynamic from "next/dynamic";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { flushSync } from "react-dom";
@@ -344,10 +346,10 @@ export default function RouteExplorer({
             <label className="field-label route-search-label" htmlFor="route-search">搜尋{district || CITY_NAMES[city]}的路名或停靠點</label>
             <div className="search-wrap"><span aria-hidden="true">⌕</span><input ref={searchInputRef} id="route-search" value={query} onChange={(event) => { if (nearby) clearNearby(); setQuery(event.target.value); }} placeholder={district === "士林區" ? "例如：延平北路、社子" : "輸入路名、地點或路線名稱"} /></div>
             <div className="locate-row">
-              <button type="button" className="locate-button" onClick={locate} disabled={locateState === "locating" || geoPermission === "unsupported"} aria-busy={locateState === "locating"} aria-describedby="locate-hint">
+              <TrackedLocationButton source="route_search" type="button" className="locate-button" onClick={locate} disabled={locateState === "locating" || geoPermission === "unsupported"} aria-busy={locateState === "locating"} aria-describedby="locate-hint">
                 <span aria-hidden="true">{locateState === "locating" ? <span className="spinner locate-spinner" /> : "◎"}</span>
                 {locateState === "locating" ? "定位中…" : "使用目前位置"}
-              </button>
+              </TrackedLocationButton>
               <small id="locate-hint">僅用於查詢附近路線，不會儲存位置</small>
             </div>
             {locateMessage(locateState, userAgent) && <p className={`locate-message ${locateState === "denied" ? "is-blocked" : ""}`} role="status">{locateMessage(locateState, userAgent)}</p>}

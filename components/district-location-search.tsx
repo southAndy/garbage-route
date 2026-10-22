@@ -1,5 +1,7 @@
 "use client";
 
+import TrackedLocationButton from "./tracked-location-button";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -59,9 +61,9 @@ export default function DistrictLocationSearch({ city, districtSlug }: { city: C
   const message = locateMessage(state, typeof navigator === "undefined" ? "" : navigator.userAgent);
   return <section className="district-location-search" aria-label="定位查詢附近路線">
     <div className="locate-row">
-      <button type="button" className="locate-button" disabled={state === "locating"} aria-busy={state === "locating"} onClick={locate}>
+      <TrackedLocationButton source="district_search" type="button" className="locate-button" disabled={state === "locating"} aria-busy={state === "locating"} onClick={locate}>
         {state === "locating" ? "正在定位與查詢…" : "◎ 使用目前位置查附近路線"}
-      </button>
+      </TrackedLocationButton>
       {nearby && <button type="button" className="clear-nearby" onClick={() => {
         generation.current++; pending.current = false; clearLocationSession(); setState("idle");
       }}>清除定位</button>}

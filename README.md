@@ -18,6 +18,14 @@ npm run dev
 
 開啟 `http://localhost:3000`。專案目前附有 2026-08-02 從雙北官方端點成功同步的 Last Known Good 快照，官方來源暫時失效時仍能測試與查詢完整 UI。
 
+## 定位按鈕分析（Vercel Web Analytics）
+
+自訂事件需 Vercel Pro 或 Enterprise，並啟用 Web Analytics。`location_button_viewed` 在按鈕至少 50% 進入可視區域時送出，每次元件掛載最多一次；`location_button_clicked` 在每次有效點擊時送出，不以授權或定位成功為條件。點擊若早於曝光回呼，會先補記曝光。兩者只附帶 `source`，不傳送座標或搜尋文字。
+
+入口：`route_search`（路線查詢區）、`district_search`（行政區頁）、`map`（地圖定位／回到我的位置圖示）、`map_retry`（展開面板的更新／重試）。清除定位不計入。地圖圖示在已有位置時的回到位置與面板切換也算點擊；分析首次定位需求時優先查看 `route_search`。
+
+在 Analytics → Events 選擇相同期間與 `source`，以點擊事件的不重複訪客數除以曝光事件的不重複訪客數。事件次數會包含重複操作與重新進站，不可當成訪客使用率；若後台只提供事件次數，就只能比較曝光／點擊次數，不能得到不重複訪客使用率。此實作不建立額外訪客識別碼，訪客辨識交由 Vercel 處理。曝光依 IntersectionObserver 判斷幾何可見範圍，不代表使用者確實注意到按鈕；攔截追蹤的瀏覽器不會完整計入。
+
 ## 使用者回饋（Tally＋Google Sheets）
 
 網站已提供頁首「意見回饋」、停靠點卡片「回報此站資訊」及查無路線時的回饋入口。點擊後才載入 Tally 表單，關閉視窗可繼續原本的查詢；若嵌入無法顯示，可另開分頁。未設定有效網址時不顯示入口。
