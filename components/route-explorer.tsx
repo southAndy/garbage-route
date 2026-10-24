@@ -19,7 +19,9 @@ import { displayTime, scheduleText } from "@/lib/schedule-display";
 import { formatDistance, GEOLOCATION_OPTIONS, locateErrorState, locateMessage, queryGeolocationPermission, roundForRequest, type GeolocationPermission, type LocateState } from "@/lib/geolocation";
 import type { NearbyResult, NearbyRoute } from "@/lib/nearby-search";
 import NearbyRouteCard from "./nearby-route-card";
-import { partitionNearbyRoutes, taipeiClock } from "@/lib/stop-timing";
+import { closestUpcomingRouteId, partitionNearbyRoutes, taipeiClock, type NearbySort } from "@/lib/stop-timing";
+import { readNearbySort, writeNearbySort } from "@/lib/nearby-sort";
+import { track } from "@vercel/analytics";
 import { ACCURACY_WARNING_METERS, clearLocationSession, getLocationSession, setLocationSession, useLocationSession } from "@/lib/user-location";
 
 const RouteMap = dynamic(() => import("./route-map"), { ssr: false, loading: () => <div className="map-loading"><span className="spinner" />正在準備地圖…</div> });
@@ -97,6 +99,14 @@ export default function RouteExplorer({
   const [userAgent, setUserAgent] = useState("");
   // Re-render once a minute while nearby results are showing so "already passed" stays current.
   const [clockTick, setClockTick] = useState(0);
+  // Read lazily: nearby mode never renders on the server, so the stored choice cannot cause a hydration mismatch.
+  const [nearbySort, setNearbySort] = useState<NearbySort>(readNearbySort);
+  const changeNearbySort = (next: NearbySort) => {
+    if (next === nearbySort) return;
+    setNearbySort(next); writeNearbySort(next);
+    // Which situation people are in (must dump now vs. willing to wait); analytics never blocks the switch.
+    try { track("nearby_sort_changed", { sort: next, from: nearbySort }); } catch { /* Tracking is optional. */ }
+  };
   useEffect(() => {
     if (!nearby) return;
     const timer = window.setInterval(() => setClockTick((tick) => tick + 1), 60_000);
@@ -327,7 +337,9 @@ export default function RouteExplorer({
   const handleMapError = useCallback(() => setMapFailed(true), []);
   // Nearby mode only exists after a click, so reading the clock here never runs on the server.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const nearbyGroups = useMemo(() => nearby ? { clock: taipeiClock(), ...partitionNearbyRoutes(nearby.routes, taipeiClock()) } : null, [nearby, clockTick]);
+  const nearbyGroups = useMemo(() => nearby ? { clock: taipeiClock(), ...partitionNearbyRoutes(nearby.routes, taipeiClock(), nearbySort) } : null, [nearby, clockTick, nearbySort]);
+  // When ordering by time, flag the closest card so people who would rather wait can still spot it.
+  const closestRouteId = nearbySort === "time" && nearbyGroups ? closestUpcomingRouteId(nearbyGroups.upcoming) : null;
   const validCount = useMemo(() => route?.stops.filter((stop) => stop.coordinateStatus === "valid").length ?? 0, [route]);
   const suspiciousIds = useMemo(() => suspiciousStopIds(route), [route]);
   const selectedWarning = useMemo(() => warningForStop(route, selectedStop), [route, selectedStop]);
@@ -375,12 +387,17 @@ export default function RouteExplorer({
             {nearby ? <>
               <div className="results-heading"><div className="step-label"><span>02</span> 附近的路線</div><button type="button" className="clear-nearby" onClick={clearNearby}>清除定位</button></div>
               <p className="nearby-summary">你附近 {nearby.radius >= 1000 ? "1 公里" : `${nearby.radius} 公尺`}內有 {nearby.routes.length} 條路線{nearby.resolved ? `，位置約在${CITY_NAMES[nearby.resolved.city]}${nearby.resolved.district}` : ""}。{nearby.expanded && "500 公尺內沒有站點，已擴大到 1 公里。"}</p>
+              {nearby.routes.length > 1 && <div className="nearby-sort" role="group" aria-label="附近路線排序">
+                <button type="button" className={nearbySort === "time" ? "active" : ""} aria-pressed={nearbySort === "time"} onClick={() => changeNearbySort("time")}>最快抵達</button>
+                <button type="button" className={nearbySort === "distance" ? "active" : ""} aria-pressed={nearbySort === "distance"} onClick={() => changeNearbySort("distance")}>最近距離</button>
+                <small>{nearbySort === "time" ? "現在就要丟：先看最快到的車" : "願意等：先看離你最近的站"}</small>
+              </div>}
               {userPosition?.accuracy != null && userPosition.accuracy > ACCURACY_WARNING_METERS && <p className="nearby-accuracy-warning" role="status">定位誤差約 {formatDistance(userPosition.accuracy)}，附近結果僅供參考，建議改用路名搜尋確認。</p>}
               {nearby.routes.length === 0 || !nearbyGroups ? <div className="empty-state"><span>1 公里內沒有垃圾車站點</span><p>請改用行政區與路名搜尋</p>{nearby.resolved && <FeedbackButton label="附近應該有站點？告訴我們" context={{ entry: "empty_nearby", city: nearby.resolved.city, district: nearby.resolved.district, radius: String(nearby.radius) }} summary={`${CITY_NAMES[nearby.resolved.city]}・${nearby.resolved.district}・附近 ${nearby.radius} 公尺無結果`} />}</div> : (
                 <div className="route-list">
                   {nearbyGroups.upcoming.length === 0 && <p className="nearby-all-passed">附近路線今天的表定時間都已過，或今日不收。以下列表可供規劃其他日子。</p>}
                   {nearbyGroups.upcoming.map(({ route: item, timing }) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card nearby-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => selectNearbyRoute(event, item)}>
-                    <NearbyRouteCard item={item} clock={nearbyGroups.clock} timing={timing} />
+                    <NearbyRouteCard item={item} clock={nearbyGroups.clock} timing={timing} closest={item.id === closestRouteId} />
                   </Link>)}
                   {nearbyGroups.later.length > 0 && <details className="nearby-later" open={nearbyGroups.upcoming.length === 0}>
                     <summary>今天已過或不收的 {nearbyGroups.later.length} 條路線</summary>

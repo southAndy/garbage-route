@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyStopTime, minutesUntil, nearbyRouteTiming, parseTime, partitionNearbyRoutes, taipeiClock } from "./stop-timing";
+import { classifyStopTime, closestUpcomingRouteId, minutesUntil, nearbyRouteTiming, parseTime, partitionNearbyRoutes, taipeiClock } from "./stop-timing";
 import type { NearbyRoute } from "./nearby-search";
 
 const everyDay = [true, true, true, true, true, true, true];
@@ -86,5 +86,29 @@ describe("nearbyRouteTiming / partitionNearbyRoutes", () => {
     expect(upcoming.map((item) => item.route.id)).toEqual(["快到了", "晚一點", "時間未提供"]);
     expect(later.map((item) => item.route.id)).toEqual(["今日不收", "已過近"]);
     expect(later.map((item) => item.timing.status)).toEqual(["notToday", "passed"]);
+  });
+
+  it("切成距離排序時，接下來的路線改依最近站點排，已過或不收的不受影響", () => {
+    const routes = [
+      nearbyRoute("已過近", { firstTime: "18:00", lastTime: "18:30", nearestDistanceMeters: 50 }),
+      nearbyRoute("晚一點", { firstTime: "20:00", lastTime: "20:10", nearestDistanceMeters: 20 }),
+      nearbyRoute("快到了", { firstTime: "19:05", lastTime: "19:15", nearestDistanceMeters: 300 }),
+      nearbyRoute("同距離較早", { firstTime: "19:30", lastTime: "19:40", nearestDistanceMeters: 300 }),
+    ];
+    const { upcoming, later } = partitionNearbyRoutes(routes, monEvening, "distance");
+    expect(upcoming.map((item) => item.route.id)).toEqual(["晚一點", "快到了", "同距離較早"]);
+    expect(later.map((item) => item.route.id)).toEqual(["已過近"]);
+    expect(partitionNearbyRoutes(routes, monEvening).upcoming.map((item) => item.route.id)).toEqual(["快到了", "同距離較早", "晚一點"]);
+  });
+
+  it("時間排序下找出離使用者最近的路線，只有一條時不標示", () => {
+    const routes = [
+      nearbyRoute("晚一點", { firstTime: "20:00", lastTime: "20:10", nearestDistanceMeters: 20 }),
+      nearbyRoute("快到了", { firstTime: "19:05", lastTime: "19:15", nearestDistanceMeters: 300 }),
+    ];
+    const { upcoming } = partitionNearbyRoutes(routes, monEvening);
+    expect(upcoming[0].route.id).toBe("快到了");
+    expect(closestUpcomingRouteId(upcoming)).toBe("晚一點");
+    expect(closestUpcomingRouteId(upcoming.slice(0, 1))).toBeNull();
   });
 });

@@ -13,9 +13,10 @@ function stopTime(stop: NearbyRoute["nearby"]["stops"][number]) {
  * so it is not mistaken for when the truck reaches the user.
  *
  * Each stop row carries `data-stop-id`; the enclosing card link reads it on
- * click so tapping a row opens the route focused on that stop.
+ * click so tapping a row opens the route focused on that stop. `closest` marks
+ * the card whose stop is nearest when the list is ordered by time instead.
  */
-export default function NearbyRouteCard({ item, clock, timing }: { item: NearbyRoute; clock?: TaipeiClock; timing?: NearbyRouteTiming }) {
+export default function NearbyRouteCard({ item, clock, timing, closest = false }: { item: NearbyRoute; clock?: TaipeiClock; timing?: NearbyRouteTiming; closest?: boolean }) {
   const { nearby } = item;
   const hidden = nearby.count - nearby.stops.length;
   const singleTime = nearby.count === 1 || nearby.firstTime === nearby.lastTime;
@@ -23,7 +24,7 @@ export default function NearbyRouteCard({ item, clock, timing }: { item: NearbyR
   return <>
     <span className="route-card-top">
       <strong>{item.routeName}{item.tripLabel ? `・${item.tripLabel}` : ""}</strong>
-      <span className="nearby-badge">最近 {formatDistance(nearby.nearestDistanceMeters)}</span>
+      <span className={`nearby-badge ${closest ? "is-closest" : ""}`}>{closest ? "離你最近" : "最近"} {formatDistance(nearby.nearestDistanceMeters)}</span>
       <i>›</i>
     </span>
     <span className="route-time nearby-time">

@@ -76,16 +76,35 @@ export function nearbyRouteTiming(route: NearbyRoute, clock: TaipeiClock): Nearb
   return { status, minutesUntilNext: minutesUntil(first, clock) ?? minutesUntil(last, clock) };
 }
 
-export function partitionNearbyRoutes(routes: NearbyRoute[], clock: TaipeiClock) {
-  const upcoming: Array<{ route: NearbyRoute; timing: NearbyRouteTiming }> = [];
-  const later: Array<{ route: NearbyRoute; timing: NearbyRouteTiming }> = [];
+/** How upcoming nearby routes are ordered: soonest arrival first, or closest stop first. */
+export type NearbySort = "time" | "distance";
+
+type TimedRoute = { route: NearbyRoute; timing: NearbyRouteTiming };
+const byTime = (a: TimedRoute, b: TimedRoute) => (a.timing.minutesUntilNext ?? Infinity) - (b.timing.minutesUntilNext ?? Infinity);
+const byDistance = (a: TimedRoute, b: TimedRoute) => a.route.nearby.nearestDistanceMeters - b.route.nearby.nearestDistanceMeters;
+
+/**
+ * Splits nearby routes into those still coming today and the rest. `sort` picks
+ * the primary key for the upcoming group (the other key breaks ties); routes
+ * that are already passed or not serving today are always ordered by distance,
+ * since they have no arrival to wait for.
+ */
+export function partitionNearbyRoutes(routes: NearbyRoute[], clock: TaipeiClock, sort: NearbySort = "time") {
+  const upcoming: TimedRoute[] = [];
+  const later: TimedRoute[] = [];
   for (const route of routes) {
     const timing = nearbyRouteTiming(route, clock);
     (timing.status === "upcoming" || timing.status === "unknown" ? upcoming : later).push({ route, timing });
   }
-  upcoming.sort((a, b) => (a.timing.minutesUntilNext ?? Infinity) - (b.timing.minutesUntilNext ?? Infinity) || a.route.nearby.nearestDistanceMeters - b.route.nearby.nearestDistanceMeters);
-  later.sort((a, b) => a.route.nearby.nearestDistanceMeters - b.route.nearby.nearestDistanceMeters);
+  upcoming.sort(sort === "distance" ? (a, b) => byDistance(a, b) || byTime(a, b) : (a, b) => byTime(a, b) || byDistance(a, b));
+  later.sort(byDistance);
   return { upcoming, later };
+}
+
+/** Id of the upcoming route whose stop is closest; null unless there are at least two to compare. */
+export function closestUpcomingRouteId(upcoming: TimedRoute[]): string | null {
+  if (upcoming.length < 2) return null;
+  return upcoming.reduce((best, item) => byDistance(item, best) < 0 ? item : best).route.id;
 }
 
 export function stopStatusLabel(status: StopTimeStatus): string | null {

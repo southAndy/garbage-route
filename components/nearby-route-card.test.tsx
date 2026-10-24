@@ -43,6 +43,13 @@ describe("NearbyRouteCard", () => {
     expect(html).not.toContain('class="nearby-more" data-stop-id');
   });
 
+  it("標為離你最近時改用醒目徽章", () => {
+    const html = renderToStaticMarkup(<NearbyRouteCard item={item} closest />);
+    expect(html).toContain("離你最近 22 公尺");
+    expect(html).toContain("is-closest");
+    expect(renderToStaticMarkup(<NearbyRouteCard item={item} />)).not.toContain("離你最近");
+  });
+
   it("只有一站時不顯示時間區間", () => {
     const single: NearbyRoute = { ...item, nearby: { ...item.nearby, count: 1, stops: item.nearby.stops.slice(0, 1), firstTime: "19:10", lastTime: "19:10" } };
     const html = renderToStaticMarkup(<NearbyRouteCard item={single} />);
