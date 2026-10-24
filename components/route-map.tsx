@@ -15,6 +15,8 @@ interface Props {
   route: GarbageRoute | null;
   selectedStop: GarbageStop | null;
   userPosition?: UserPosition | null;
+  /** Changes when the stop popup grows or shrinks, so the selected stop is re-aimed at the gap above it. */
+  popupLayout?: string;
   onSelectStop: (stop: GarbageStop) => void;
   onMapError: () => void;
 }
@@ -58,7 +60,7 @@ function selectedStopOffset(mapElement: HTMLElement): [number, number] {
   const centerX = stage.left + stage.width / 2;
   const centerY = stage.top + stage.height / 2;
   if (!popup || popup.left > centerX || popup.right < centerX || popup.top > centerY + SELECTED_STOP_RADIUS) return [0, 0];
-  const badge = mapElement.parentElement?.querySelector(".route-badge")?.getBoundingClientRect();
+  const badge = mapElement.parentElement?.querySelector(".route-strip")?.getBoundingClientRect();
   return [0, ((badge?.bottom ?? stage.top) + popup.top) / 2 - centerY];
 }
 
@@ -79,7 +81,7 @@ const activeHandlers: { onSelectStop: (stop: GarbageStop) => void; getRoute: () 
 };
 let cachedMap: CachedMap | null = null;
 
-export default function RouteMap({ route, selectedStop, userPosition = null, onSelectStop, onMapError }: Props) {
+export default function RouteMap({ route, selectedStop, userPosition = null, popupLayout = "", onSelectStop, onMapError }: Props) {
   const wrapper = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const routeRef = useRef(route);
@@ -275,7 +277,7 @@ export default function RouteMap({ route, selectedStop, userPosition = null, onS
     if (selectedStop?.coordinateStatus === "valid") {
       map.easeTo({ center: [selectedStop.longitude!, selectedStop.latitude!], zoom: Math.max(map.getZoom(), 15), offset: selectedStopOffset(map.getContainer()), duration: 550 });
     }
-  }, [ready, selectedStop]);
+  }, [ready, selectedStop, popupLayout]);
 
   return <>
     <div ref={wrapper} className="map-canvas" aria-label="選中垃圾車路線地圖" />

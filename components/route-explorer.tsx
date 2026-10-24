@@ -22,6 +22,9 @@ import NearbyRouteCard from "./nearby-route-card";
 import SearchRouteCard from "./search-route-card";
 import { closestUpcomingRouteId, partitionNearbyRoutes, partitionSearchResults, routeSpanLabel, routeSpanStatus, taipeiClock, type NearbySort } from "@/lib/stop-timing";
 import { dismissNearbyHint, hasSeenLocateExplainer, isNearbyHintDismissed, markLocateExplainerSeen } from "@/lib/search-hints";
+import { nextUpcomingStop, routeTodayStatus, scheduleRows, stopPillLabel, stopStatus, WEEKDAY_NAMES } from "@/lib/route-status";
+import { markVisited, requestSurveyPrompt, setSurveyBlocked, type SurveyTrigger } from "@/lib/survey-prompt";
+import { haversineMeters } from "@/lib/nearby-search";
 import { readNearbySort, writeNearbySort } from "@/lib/nearby-sort";
 import { readListScroll, saveListScroll } from "@/lib/list-scroll";
 import { track } from "@vercel/analytics";
@@ -37,6 +40,10 @@ function subscribeToViewport(onChange: () => void) {
 }
 function getMobileSnapshot() { return window.matchMedia(mobileQuery).matches; }
 function getServerMobileSnapshot() { return false; }
+// Anything that depends on the clock renders only after hydration: route pages are prerendered,
+// and text computed from build time would not match the browser's.
+const noopSubscribe = () => () => {};
+function useHydrated() { return useSyncExternalStore(noopSubscribe, () => true, () => false); }
 
 type District = { name: string; slug: string; routeCount: number };
 
@@ -97,8 +104,24 @@ export default function RouteExplorer({
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
   const [loadingRoutes, setLoadingRoutes] = useState(true);
   const [error, setError] = useState(invalidSharedPath ? "分享的路線已失效，請重新選擇路線。" : "");
-  const [mobileStopOpen, setMobileStopOpen] = useState(() => Boolean(initialFocus?.showDetails && selectedStop && selectedStop.id === initialFocus.stopId));
+  // The collapsed popup is small enough to show from the start; closing it is one tap away.
+  const [mobileStopOpen, setMobileStopOpen] = useState(() => Boolean(initialRoute && selectedStop));
+  // The mobile popup opens collapsed (time, name, prev/next); details unfold on request.
+  const [popupExpanded, setPopupExpanded] = useState(() => Boolean(initialFocus?.showDetails));
+  // The mobile status strip over the map folds the span, counts and actions behind a toggle.
+  const [stripOpen, setStripOpen] = useState(false);
+  const hydrated = useHydrated();
   useEffect(() => { clearPendingStopFocus(); }, []);
+  // Without an explicit focus, land on the next stop still to come rather than stop 1. Done after
+  // mount because it needs the clock; the server HTML keeps stop 1 so hydration matches.
+  const autoSelectedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!route || initialFocus || autoSelectedFor.current === route.id) return;
+    autoSelectedFor.current = route.id;
+    const next = nextUpcomingStop(route, taipeiClock());
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (next) setSelectedStop((current) => current && current.id !== route.stops[0]?.id ? current : next);
+  }, [route, initialFocus]);
   const [mapFailed, setMapFailed] = useState(false);
   // Keep the mobile map visible on entry; users open the search sheet explicitly.
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
@@ -161,10 +184,10 @@ export default function RouteExplorer({
 
   const listVisible = !isMobile || mobilePanelOpen;
   useEffect(() => {
-    if (!nearby && !listVisible) return;
+    if (!nearby && !listVisible && !route) return;
     const timer = window.setInterval(() => setClockTick((tick) => tick + 1), 60_000);
     return () => window.clearInterval(timer);
-  }, [nearby, listVisible]);
+  }, [nearby, listVisible, route]);
 
   // The open mobile panel is the only thing that scrolls; the document behind it must not.
   useEffect(() => {
@@ -387,8 +410,11 @@ export default function RouteExplorer({
       // Also stash the focus for the remount that happens when this push leaves the home page.
       setPendingStopFocus(focused ? { routeId: detail.id, stopId: focused.id, showDetails: Boolean(focus?.showDetails) } : null);
       setRoute(detail);
-      setSelectedStop(focused ?? detail.stops[0] ?? null);
+      autoSelectedFor.current = detail.id;
+      setSelectedStop(focused ?? nextUpcomingStop(detail, taipeiClock()) ?? detail.stops[0] ?? null);
       setMobileStopOpen(Boolean(focused && focus?.showDetails));
+      setPopupExpanded(Boolean(focused && focus?.showDetails));
+      setStripOpen(false);
       setMobilePanelOpen(false);
       const search = new URLSearchParams();
       if (query) search.set("q", query);
@@ -412,17 +438,25 @@ export default function RouteExplorer({
   const selectNearbyRoute = (event: MouseEvent<HTMLAnchorElement>, item: NearbyRoute) => selectCardRoute(event, item, item.nearby.stops[0]?.stopId);
 
   const selectedIndex = route && selectedStop ? route.stops.findIndex((stop) => stop.id === selectedStop.id) : -1;
-  const chooseStop = useCallback((stop: GarbageStop) => {
+  // Survey timing: a stop interaction starts the dwell timer (lib/survey-prompt.ts).
+  const surveyContext = useMemo(() => route ? { route_id: route.id, city: route.cityCode, district: route.district } : null, [route]);
+  const noteInteraction = useCallback((trigger: SurveyTrigger) => { if (surveyContext) requestSurveyPrompt(trigger, surveyContext); }, [surveyContext]);
+  useEffect(() => { markVisited(); }, []);
+  // The sheet waits while the search panel, the location explainer or the popup details are up.
+  useEffect(() => { setSurveyBlocked((isMobile && (mobilePanelOpen || popupExpanded)) || locateExplainerOpen); }, [isMobile, mobilePanelOpen, popupExpanded, locateExplainerOpen]);
+  const chooseStop = useCallback((stop: GarbageStop, trigger: SurveyTrigger = "stop_dwell") => {
     setSelectedStop(stop);
     setMobileStopOpen(true);
-  }, []);
+    noteInteraction(trigger);
+  }, [noteInteraction]);
   const viewStopOnMap = useCallback((stop: GarbageStop) => {
     setSelectedStop(stop);
     setMobileStopOpen(true);
     setMobilePanelOpen(false);
+    noteInteraction("stop_dwell");
     mapStageRef.current?.focus({ preventScroll: true });
     mapStageRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
-  }, []);
+  }, [noteInteraction]);
   const openRouteSearch = () => {
     // Mount the mobile input before focusing it, within the user's click.
     flushSync(() => setMobilePanelOpen(true));
@@ -434,7 +468,11 @@ export default function RouteExplorer({
   // Routes and nearby results only arrive after client-side fetches, so every render that reads
   // the clock happens in the browser and the server HTML (empty list) never disagrees with it.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const clock = useMemo(() => taipeiClock(), [routes, nearby, clockTick]);
+  const clock = useMemo(() => taipeiClock(), [routes, nearby, route, clockTick]);
+  const routeStatus = useMemo(() => hydrated && route ? routeTodayStatus(route, clock) : null, [hydrated, route, clock]);
+  const selectedStopStatus = hydrated && selectedStop ? stopStatus(selectedStop, clock) : null;
+  const selectedStopPill = hydrated && selectedStop ? stopPillLabel(selectedStop, clock) : null;
+  const selectedStopDistance = userPosition && selectedStop?.coordinateStatus === "valid" ? haversineMeters(userPosition, { lat: selectedStop.latitude!, lng: selectedStop.longitude! }) : null;
   const nearbyGroups = useMemo(() => nearby ? partitionNearbyRoutes(nearby.routes, clock, nearbySort) : null, [nearby, clock, nearbySort]);
   const searchGroups = useMemo(() => !nearby && debouncedQuery.trim() ? partitionSearchResults(routes, clock) : null, [nearby, debouncedQuery, routes, clock]);
   // When ordering by time, flag the closest card so people who would rather wait can still spot it.
@@ -587,41 +625,73 @@ export default function RouteExplorer({
         </aside>
 
         <section className="map-stage" ref={mapStageRef} tabIndex={-1} aria-label="路線地圖與所選停靠點">
-          {mapFailed ? <div className="map-fallback"><strong>地圖目前無法載入</strong><p>仍可從路線面板查看完整停靠點。</p><button onClick={() => { setMapFailed(false); window.location.reload(); }}>重新載入</button></div> : <RouteMap route={route} selectedStop={selectedStop} userPosition={userPosition} onSelectStop={chooseStop} onMapError={handleMapError} />}
+          {mapFailed ? <div className="map-fallback"><strong>地圖目前無法載入</strong><p>仍可從路線面板查看完整停靠點。</p><button onClick={() => { setMapFailed(false); window.location.reload(); }}>重新載入</button></div> : <RouteMap route={route} selectedStop={selectedStop} userPosition={userPosition} popupLayout={`${mobileStopOpen}-${popupExpanded}`} onSelectStop={chooseStop} onMapError={handleMapError} />}
           {!route && !invalidSharedPath && <div className="map-intro"><p className="eyebrow">TAIPEI · NEW TAIPEI</p><h1>台北、新北<br />垃圾車時間與路線查詢</h1><p>今晚的垃圾車會停在哪裡？<br />選擇城市、行政區與路線，查看每一站的表定時間。</p><div className="intro-steps"><span><b>1</b>選城市</span><i>→</i><span><b>2</b>選行政區</span><i>→</i><span><b>3</b>看路線</span></div><button type="button" className="intro-search-button" onClick={openRouteSearch} aria-controls="route-search-panel">搜尋路名或地點 →</button></div>}
           {route && validCount === 0 && <div className="map-warning">此路線暫無可用地圖位置，請查看文字停靠點列表。</div>}
           {route && warningCount > 0 && <div className="map-warning coordinate-review-warning" role="status">此路線有 {warningCount} 項位置待確認，橘色虛線為可疑區段。</div>}
-          {route && <div className="route-badge">
-            <span><Link href={cityPath(route.cityCode)}>{CITY_NAMES[route.cityCode]}</Link>・<Link href={districtPath(route.cityCode, route.districtSlug)}>{route.district}</Link></span>
-            <h1>{route.routeName}{route.tripLabel ? `・${route.tripLabel}` : ""}</h1>
-            <small>全線表定 {route.firstArrivalTime ?? "--:--"} — {route.lastArrivalTime ?? "--:--"}・{route.stopCount} 站</small>
-            <p className="route-summary">{route.routeName}{route.tripLabel ? `・${route.tripLabel}` : ""}位於{CITY_NAMES[route.cityCode]}{route.district}，表定時間 {route.firstArrivalTime ?? "未提供"} 至 {route.lastArrivalTime ?? "未提供"}，共 {route.stopCount} 個停靠點。</p>
-            <a className="view-stops-button" href="#route-stops">查看全部站點與時間 ↓</a>
-            <div className="route-search-shortcut"><span>不是你要找的路線？</span><button type="button" onClick={openRouteSearch} aria-controls="route-search-panel">搜尋其他地點</button></div>
-          </div>}
-          {selectedStop && route && <article className={`stop-popup ${mobileStopOpen ? "mobile-stop-open" : ""}`} aria-live="polite">
-            <div className="popup-head"><span>第 {String(selectedStop.sequence).padStart(2, "0")} 站・表定抵達</span><button aria-label="關閉停靠點資訊" onClick={() => setSelectedStop(null)}>×</button></div>
-            <time>{displayTime(selectedStop)}</time>
-            <h2>{selectedStop.name}</h2>
-            <a className="mobile-stop-details-link" href={`#stop-details-${selectedStop.id}`} onClick={(event) => {
-              event.preventDefault();
-              const target = document.getElementById(`stop-details-${selectedStop.id}`);
-              if (target instanceof HTMLDetailsElement) target.open = true;
-              target?.querySelector("summary")?.focus({ preventScroll: true });
-              target?.scrollIntoView({ block: "start", behavior: "auto" });
-            }}>查看此站完整資訊 ↓</a>
-            <div className="mobile-popup-feedback">
-              <FeedbackButton label="回報此站問題" context={{ entry: "stop", city: route.cityCode, district: route.district, route_id: route.id, stop_id: selectedStop.id, source_synced_at: route.source.syncedAt }} summary={`${CITY_NAMES[route.cityCode]}・${route.district}・${route.routeName}・第 ${selectedStop.sequence} 站 ${selectedStop.name}`} />
+          {route && <div className={`route-strip ${stripOpen ? "is-open" : ""}`}>
+            <div className="route-strip-head">
+              <div className="route-strip-main">
+                <span className="route-strip-area"><Link href={cityPath(route.cityCode)}>{CITY_NAMES[route.cityCode]}</Link>・<Link href={districtPath(route.cityCode, route.districtSlug)}>{route.district}</Link></span>
+                <span className="route-strip-line">
+                  <h1>{route.routeName}{route.tripLabel ? `・${route.tripLabel}` : ""}</h1>
+                  {routeStatus?.label && <span className={`route-status is-${routeStatus.kind}`}>{routeStatus.label}</span>}
+                  {routeStatus?.stop ? <span className="route-strip-next">{routeStatus.stopLead} {routeStatus.kind !== "notToday" && <b>{displayTime(routeStatus.stop)}</b>} {routeStatus.stop.name}</span> : <span className="route-strip-next">全線 {route.firstArrivalTime ?? "--:--"}–{route.lastArrivalTime ?? "--:--"}・{route.stopCount} 站</span>}
+                </span>
+              </div>
+              <button type="button" className="route-strip-toggle" aria-expanded={stripOpen} aria-controls="route-strip-details" aria-label={stripOpen ? "收合路線資訊" : "展開路線資訊"} onClick={() => setStripOpen((open) => !open)}><span aria-hidden="true">{stripOpen ? "⌃" : "⌄"}</span></button>
             </div>
-            <div className="desktop-stop-details">
-            <p>{selectedStop.address || "地址未提供"}{selectedStop.village ? `・${selectedStop.village}` : ""}</p>
-            {selectedStop.departureTime && <p className="detail-row">預定離開 <b>{displayTime(selectedStop, "departureTime")}</b></p>}
-            {selectedStop.memo && <p className="memo">{selectedStop.memo}</p>}
-            {selectedStop.schedule && <div className="schedule"><span>一般垃圾 <b>{scheduleText(selectedStop.schedule.garbage)}</b></span><span>資源回收 <b>{scheduleText(selectedStop.schedule.recycling)}</b></span><span>廚餘 <b>{scheduleText(selectedStop.schedule.foodScraps)}</b></span></div>}
-            {selectedStop.coordinateStatus !== "valid" && <p className="coordinate-warning">此站座標無法定位</p>}
-            {selectedWarning && <p className="coordinate-warning">官方座標可能有誤；橘色虛線為依原始座標繪製的待確認區段，請以地址文字為準。</p>}
-            <FeedbackButton label="回報此站資訊" context={{ entry: "stop", city: route.cityCode, district: route.district, route_id: route.id, stop_id: selectedStop.id, source_synced_at: route.source.syncedAt }} summary={`${CITY_NAMES[route.cityCode]}・${route.district}・${route.routeName}・第 ${selectedStop.sequence} 站 ${selectedStop.name}`} />
-            <div className="popup-nav"><button disabled={selectedIndex <= 0} onClick={() => setSelectedStop(route.stops[selectedIndex - 1])}>← 上一站</button><span>{selectedIndex + 1} / {route.stopCount}</span><button disabled={selectedIndex >= route.stops.length - 1} onClick={() => setSelectedStop(route.stops[selectedIndex + 1])}>下一站 →</button></div>
+            <div id="route-strip-details" className="route-strip-details">
+              <p className="route-strip-today"><i aria-hidden="true" className={`route-strip-dot is-${routeStatus?.kind ?? "unknown"}`} /><span><b>{routeStatus?.today ?? "表定時間"}</b>・全線 {route.firstArrivalTime ?? "--:--"}–{route.lastArrivalTime ?? "--:--"}・{route.stopCount} 站</span></p>
+              <p className="route-strip-note">{routeStatus?.detail}表定時間非車輛即時位置，假日或臨時調整以清潔隊公告為準。</p>
+              <p className="route-summary">{route.routeName}{route.tripLabel ? `・${route.tripLabel}` : ""}位於{CITY_NAMES[route.cityCode]}{route.district}，表定時間 {route.firstArrivalTime ?? "未提供"} 至 {route.lastArrivalTime ?? "未提供"}，共 {route.stopCount} 個停靠點。</p>
+              <div className="route-strip-actions">
+                <a className="view-stops-button" href="#route-stops">全部站點與時間 ↓</a>
+                <FeedbackButton label="回報路線問題" context={{ entry: "general", city: route.cityCode, district: route.district, route_id: route.id, source_synced_at: route.source.syncedAt }} summary={`${CITY_NAMES[route.cityCode]}・${route.district}・${route.routeName}`} />
+              </div>
+            </div>
+          </div>}
+          {selectedStop && route && <article className={`stop-popup ${mobileStopOpen ? "mobile-stop-open" : ""} ${popupExpanded ? "is-expanded" : ""}`} aria-live="polite">
+            <div className="popup-head">
+              <span className="popup-head-meta"><span>第 {String(selectedStop.sequence).padStart(2, "0")} 站</span>{selectedStopPill && <span className={`route-status is-${selectedStopStatus}`}>{selectedStopPill}</span>}</span>
+              <button aria-label="關閉停靠點資訊" onClick={() => setSelectedStop(null)}>×</button>
+            </div>
+            <div className="popup-title">
+              <time>{displayTime(selectedStop)}</time>
+              <h2>{selectedStop.name}</h2>
+              {selectedStop.village && <small className="popup-village">{selectedStop.village}</small>}
+            </div>
+            <div className="popup-details">
+              <p>{selectedStop.address || "地址未提供"}{selectedStop.village ? `・${selectedStop.village}` : ""}</p>
+              {selectedStopDistance !== null && <p className="popup-distance"><span aria-hidden="true" className="popup-distance-dot" />距你約 {formatDistance(selectedStopDistance)}<span>（直線距離）</span></p>}
+              {selectedStop.departureTime && <p className="detail-row">預定離開 <b>{displayTime(selectedStop, "departureTime")}</b></p>}
+              {selectedStop.memo && <p className="memo">{selectedStop.memo}</p>}
+              {selectedStopStatus === "passed" && routeStatus?.kind === "running" && routeStatus.stop && <p className="popup-note">已過表定時間不代表車已離開。<button type="button" onClick={() => chooseStop(routeStatus.stop!)}>跳到下一個即將到的站 {displayTime(routeStatus.stop)} {routeStatus.stop.name} →</button></p>}
+              {selectedStopStatus === "notToday" && <p className="popup-note">{routeStatus?.today ?? "今天不收"}{routeStatus?.detail ? `，${routeStatus.detail}` : "。"}<Link href="/collection-points">找限時收受點 →</Link></p>}
+              {selectedStop.schedule && <div className="schedule day-schedule">
+                {scheduleRows(selectedStop).map((row) => <div key={row.label} className="day-schedule-row">
+                  <span>{row.label}</span>
+                  <ul aria-label={`${row.label}清運星期`} className="day-grid">{WEEKDAY_NAMES.map((name, index) => <li key={name} className={`${row.days[index] ? "is-on" : ""} ${hydrated && index === clock.weekday ? "is-today" : ""}`} aria-label={`${row.days[index] ? "" : "不"}收週${name}`}>{name}</li>)}</ul>
+                </div>)}
+              </div>}
+              {selectedStop.coordinateStatus !== "valid" && <p className="coordinate-warning">此站座標無法定位</p>}
+              {selectedWarning && <p className="coordinate-warning">官方座標可能有誤；橘色虛線為依原始座標繪製的待確認區段，請以地址文字為準。</p>}
+              <div className="popup-links">
+                <a className="mobile-stop-details-link" href={`#stop-details-${selectedStop.id}`} onClick={(event) => {
+                  event.preventDefault();
+                  const target = document.getElementById(`stop-details-${selectedStop.id}`);
+                  if (target instanceof HTMLDetailsElement) target.open = true;
+                  target?.querySelector("summary")?.focus({ preventScroll: true });
+                  target?.scrollIntoView({ block: "start", behavior: "auto" });
+                }}>在列表查看此站</a>
+                <FeedbackButton label="回報此站問題" context={{ entry: "stop", city: route.cityCode, district: route.district, route_id: route.id, stop_id: selectedStop.id, source_synced_at: route.source.syncedAt }} summary={`${CITY_NAMES[route.cityCode]}・${route.district}・${route.routeName}・第 ${selectedStop.sequence} 站 ${selectedStop.name}`} />
+              </div>
+            </div>
+            <div className="popup-nav">
+              <button disabled={selectedIndex <= 0} onClick={() => chooseStop(route.stops[selectedIndex - 1], "stop_nav")}>← 上一站</button>
+              <span className="popup-count">{selectedIndex + 1} / {route.stopCount}</span>
+              <button type="button" className="popup-toggle" aria-expanded={popupExpanded} onClick={() => { setPopupExpanded((open) => !open); noteInteraction("stop_dwell"); }}>{popupExpanded ? "收合 ⌄" : "詳細資訊 ⌃"}</button>
+              <button disabled={selectedIndex >= route.stops.length - 1} onClick={() => chooseStop(route.stops[selectedIndex + 1], "stop_nav")}>下一站 →</button>
             </div>
           </article>}
         </section>

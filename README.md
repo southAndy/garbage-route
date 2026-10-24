@@ -26,6 +26,8 @@ npm run dev
 
 `nearby_sort_time`（切到最快抵達）與 `nearby_sort_distance`（切到最近距離）在附近路線的排序實際改變時送出，附帶 `from`（原排序）；重按已選中的選項不計。切換值會存在瀏覽器 `localStorage`，所以事件代表「改變偏好」而非每次進站的設定。`nearby_sort_distance` 的比例可視為「願意等離家最近那台車」的使用者佔比。
 
+路線頁的查詢體驗問卷（`components/survey-prompt.tsx`）在點過站點或換過站之後再停留 20 秒才以底部抽屜跳出，搜尋面板或站點詳情開著時延後；同一次瀏覽只問一次，回答或關掉後記在 `localStorage`，14 天內不再出現。事件：`survey_shown`（`trigger`：`stop_dwell`／`stop_nav`、`visit`：`first`／`return`）、`survey_answered`（`outcome`：`found`／`not_found`）、`survey_reasons`（`reasons` 以逗號相接，略過為 `skipped`）、`survey_form_opened`、`survey_form_declined`、`survey_dismissed`（`step`：`question`／`reasons`／`invite`），都附帶 `route_id`、`city`、`district`，不含位置或自由文字。`survey_shown → survey_answered` 看問法與時機，`survey_answered → survey_form_opened` 看 Tally 表單值不值得留；`outcome=not_found` 的比例與 `reasons` 分布本身就是產品回饋，不必等表單。
+
 在 Analytics → Events 選擇相同期間與 `source`，以點擊事件的不重複訪客數除以曝光事件的不重複訪客數。事件次數會包含重複操作與重新進站，不可當成訪客使用率；若後台只提供事件次數，就只能比較曝光／點擊次數，不能得到不重複訪客使用率。此實作不建立額外訪客識別碼，訪客辨識交由 Vercel 處理。曝光依 IntersectionObserver 判斷幾何可見範圍，不代表使用者確實注意到按鈕；攔截追蹤的瀏覽器不會完整計入。
 
 ## 使用者回饋（Tally＋Google Sheets）
