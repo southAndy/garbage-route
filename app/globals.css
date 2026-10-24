@@ -41,6 +41,10 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 .locate-button:hover:not(:disabled) { background:#eef5f0; border-style:solid; }
 .locate-button:disabled { color:var(--muted); cursor:default; }
 .locate-button:focus-visible { outline:2px solid var(--green); outline-offset:2px; }
+.locate-button.is-active { color:#fff; background:var(--green); border:1px solid var(--green); box-shadow:0 2px 8px rgba(23,60,48,.22); }
+.locate-button.is-active:hover:not(:disabled) { background:#174f3b; border-color:#174f3b; }
+.locate-row.is-active small { color:var(--green); font-weight:600; }
+.locate-row.is-active .clear-nearby { min-height:28px; padding:0 6px; }
 .locate-button > span { font-size:15px; line-height:1; }
 .locate-spinner { width:14px; height:14px; margin:0; border-width:2px; }
 .locate-row small { color:var(--muted); font-size:11px; }

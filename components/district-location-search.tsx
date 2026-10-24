@@ -60,9 +60,9 @@ export default function DistrictLocationSearch({ city, districtSlug }: { city: C
   const nearby = resolved?.city === city && resolved.districtSlug === districtSlug ? session?.nearby : null;
   const message = locateMessage(state, typeof navigator === "undefined" ? "" : navigator.userAgent);
   return <section className="district-location-search" aria-label="定位查詢附近路線">
-    <div className="locate-row">
-      <TrackedLocationButton source="district_search" type="button" className="locate-button" disabled={state === "locating"} aria-busy={state === "locating"} onClick={locate}>
-        {state === "locating" ? "正在定位與查詢…" : "◎ 使用目前位置查附近路線"}
+    <div className={`locate-row ${nearby ? "is-active" : ""}`}>
+      <TrackedLocationButton source="district_search" type="button" className={`locate-button ${nearby ? "is-active" : ""}`} disabled={state === "locating"} aria-busy={state === "locating"} onClick={locate}>
+        {state === "locating" ? "正在定位與查詢…" : nearby ? "◉ 已依目前位置顯示附近路線" : "◎ 使用目前位置查附近路線"}
       </TrackedLocationButton>
       {nearby && <button type="button" className="clear-nearby" onClick={() => {
         generation.current++; pending.current = false; clearLocationSession(); setState("idle");
