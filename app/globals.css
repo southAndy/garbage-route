@@ -344,7 +344,14 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
   .intro-search-button { display:block; width:100%; min-height:44px; margin-top:10px; padding:10px 12px; border:0; border-radius:8px; background:var(--green); color:white; font-weight:600; cursor:pointer; }
   .sidebar.is-open ~ .map-stage .map-intro { display:none; }
   .filters .select-wrap,.filters .search-wrap { display:block; width:100%; margin-left:0; }
-  .sidebar .search-panel-content { height:min(65dvh,calc(var(--viewport-height,100dvh) - 180px)); }
+  /* The open sheet scrolls as one panel: filters scroll away so the list gets the room, and the
+     results heading stays pinned so the count and "clear location" remain reachable. */
+  .sidebar .search-panel-content { height:min(65dvh,calc(var(--viewport-height,100dvh) - 180px)); overflow-y:auto; overscroll-behavior:contain; scroll-padding-top:52px; }
+  .search-panel-content > .filters,.search-panel-content > .route-results { flex-shrink:0; }
+  .search-panel-content .route-list { overflow:visible; }
+  .route-results { padding-top:0; }
+  .search-panel-content .results-heading { position:sticky; top:0; z-index:2; margin:0 -14px; padding:12px 24px 10px; background:var(--paper); border-bottom:1px solid var(--line); }
+  .search-panel-content .results-heading + * { margin-top:12px; }
   /* Give typing the visible viewport; a short bottom sheet clips the stacked filters. */
   .sidebar .search-panel-content.is-typing {
     position:fixed;

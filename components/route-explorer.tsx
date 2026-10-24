@@ -21,6 +21,7 @@ import type { NearbyResult, NearbyRoute } from "@/lib/nearby-search";
 import NearbyRouteCard from "./nearby-route-card";
 import { closestUpcomingRouteId, partitionNearbyRoutes, taipeiClock, type NearbySort } from "@/lib/stop-timing";
 import { readNearbySort, writeNearbySort } from "@/lib/nearby-sort";
+import { readListScroll, saveListScroll } from "@/lib/list-scroll";
 import { track } from "@vercel/analytics";
 import { ACCURACY_WARNING_METERS, clearLocationSession, clearPendingStopFocus, getLocationSession, peekPendingStopFocus, setLocationSession, setPendingStopFocus, useLocationSession } from "@/lib/user-location";
 
@@ -75,6 +76,9 @@ export default function RouteExplorer({
   const mapStageRef = useRef<HTMLElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
+  // The mobile sheet scrolls as one panel; on desktop only the list scrolls. Both offsets are kept.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const [city, setCity] = useState<CityCode>(initialRoute?.cityCode ?? initialCity);
   const [districts, setDistricts] = useState<District[]>([]);
   const [loadingDistricts, setLoadingDistricts] = useState(true);
@@ -130,6 +134,32 @@ export default function RouteExplorer({
     // Which situation people are in (must dump now vs. willing to wait); analytics never blocks the switch.
     try { track("nearby_sort_changed", { sort: next, from: nearbySort }); } catch { /* Tracking is optional. */ }
   };
+  // One result set = one scroll position, so switching district or typing starts at the top
+  // while opening a route and coming back (a remount) lands where the user left off.
+  const listKey = `${city}|${district}|${debouncedQuery}|${nearby ? "nearby" : "list"}`;
+  const rememberScroll = () => saveListScroll(listKey, { panel: panelRef.current?.scrollTop ?? 0, list: listRef.current?.scrollTop ?? 0 });
+  const scrollAppliedFor = useRef<string | null>(null);
+  useEffect(() => {
+    // display:none elements cannot be scrolled, so wait until the sheet is open.
+    if (loadingRoutes || (isMobile && !mobilePanelOpen) || scrollAppliedFor.current === listKey) return;
+    const list = listRef.current;
+    if (!list) return;
+    scrollAppliedFor.current = listKey;
+    const saved = readListScroll(listKey);
+    if (saved) {
+      if (panelRef.current) panelRef.current.scrollTop = saved.panel;
+      list.scrollTop = saved.list;
+      return;
+    }
+    // Fresh arrival on a route page: bring the current route's card into the middle of the list
+    // without scrolling the document (scrollIntoView would move the page as well).
+    const selected = list.querySelector<HTMLElement>(".route-card.selected");
+    if (!selected) return;
+    const listRect = list.getBoundingClientRect();
+    const cardRect = selected.getBoundingClientRect();
+    list.scrollTop += cardRect.top - listRect.top - (list.clientHeight - cardRect.height) / 2;
+  }, [listKey, loadingRoutes, isMobile, mobilePanelOpen]);
+
   useEffect(() => {
     if (!nearby) return;
     const timer = window.setInterval(() => setClockTick((tick) => tick + 1), 60_000);
@@ -383,7 +413,7 @@ export default function RouteExplorer({
             <span className="sheet-grip" aria-hidden="true" />
             <span className="sheet-label"><strong>{district || CITY_NAMES[city]}</strong><span>{mobilePanelOpen ? "收合路線搜尋" : route ? "搜尋其他路線" : "搜尋垃圾車路線"}</span><span aria-hidden="true">{mobilePanelOpen ? "⌄" : "⌃"}</span></span>
           </button>
-          <div id="route-search-panel" className={`search-panel-content ${searchExpanded ? "is-typing" : ""}`} hidden={isMobile && !mobilePanelOpen}>
+          <div ref={panelRef} id="route-search-panel" className={`search-panel-content ${searchExpanded ? "is-typing" : ""}`} hidden={isMobile && !mobilePanelOpen} onScroll={rememberScroll}>
           {(!isMobile || mobilePanelOpen) && <>
           <div className="filters">
             <div className="step-label"><span>01</span> 選擇查詢範圍</div>
@@ -421,7 +451,7 @@ export default function RouteExplorer({
               </div>}
               {userPosition?.accuracy != null && userPosition.accuracy > ACCURACY_WARNING_METERS && <p className="nearby-accuracy-warning" role="status">定位誤差約 {formatDistance(userPosition.accuracy)}，附近結果僅供參考，建議改用路名搜尋確認。</p>}
               {nearby.routes.length === 0 || !nearbyGroups ? <div className="empty-state"><span>1 公里內沒有垃圾車站點</span><p>請改用行政區與路名搜尋</p>{nearby.resolved && <FeedbackButton label="附近應該有站點？告訴我們" context={{ entry: "empty_nearby", city: nearby.resolved.city, district: nearby.resolved.district, radius: String(nearby.radius) }} summary={`${CITY_NAMES[nearby.resolved.city]}・${nearby.resolved.district}・附近 ${nearby.radius} 公尺無結果`} />}</div> : (
-                <div className="route-list">
+                <div ref={listRef} className="route-list" onScroll={rememberScroll}>
                   {nearbyGroups.upcoming.length === 0 && <p className="nearby-all-passed">附近路線今天的表定時間都已過，或今日不收。以下列表可供規劃其他日子。</p>}
                   {nearbyGroups.upcoming.map(({ route: item, timing }) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card nearby-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => selectNearbyRoute(event, item)}>
                     <NearbyRouteCard item={item} clock={nearbyGroups.clock} timing={timing} closest={item.id === closestRouteId} />
@@ -439,7 +469,7 @@ export default function RouteExplorer({
             <div className="results-heading"><div className="step-label"><span>02</span> 選擇路線</div><small>{loadingRoutes ? "查詢中…" : `${routes.length} 條結果`}</small></div>
             {error && <div className="alert" role="alert">{error}</div>}
             {loadingRoutes ? <div className="routes-loading" role="status"><span className="spinner" aria-hidden="true" /><span>正在載入路線資料…</span></div> : routes.length === 0 ? !error && <div className="empty-state"><span>沒有相符路線</span><p>試試其他關鍵字或行政區</p>{district && <FeedbackButton label="找不到要找的地點？告訴我們" context={{ entry: "empty_search", city, district, query: debouncedQuery }} summary={`${CITY_NAMES[city]}・${district}${debouncedQuery ? `・搜尋：${debouncedQuery}` : ""}`} />}</div> : (
-              <div className="route-list">
+              <div ref={listRef} className="route-list" onScroll={rememberScroll}>
                 {routes.map((item) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); selectRoute(item); }}>
                   <span className="route-card-top"><strong>{item.routeName}{item.tripLabel ? `・${item.tripLabel}` : ""}</strong><i>›</i></span>
                   <span className="route-time">{item.firstArrivalTime ?? "--:--"}<em>—</em>{item.lastArrivalTime ?? "--:--"}</span>
