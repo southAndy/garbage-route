@@ -63,6 +63,23 @@ export function useLocationSession() {
   return useSyncExternalStore(subscribeLocationSession, getLocationSession, getServerSnapshot);
 }
 
+/** The stop a route should open on, chosen before navigating into that route's page. */
+export interface StopFocus { routeId: string; stopId: string; showDetails: boolean }
+
+// Opening a route from the home page swaps in a different page component, so the
+// explorer remounts and would otherwise land on stop 1. The focus is kept here across
+// that remount; the explorer reads it during mount and clears it once mounted.
+let pendingFocus: StopFocus | null = null;
+
+export function setPendingStopFocus(focus: StopFocus | null) { pendingFocus = focus; }
+
+/** The pending focus when it targets this route; null otherwise. Does not clear it. */
+export function peekPendingStopFocus(routeId: string): StopFocus | null {
+  return pendingFocus?.routeId === routeId ? pendingFocus : null;
+}
+
+export function clearPendingStopFocus() { pendingFocus = null; }
+
 /** Distance from the position to the closest stop, or null when none has usable coordinates. */
 export function nearestStopDistanceMeters(position: UserPosition, stops: GarbageStop[]): number | null {
   let nearest: number | null = null;

@@ -22,7 +22,7 @@ import NearbyRouteCard from "./nearby-route-card";
 import { closestUpcomingRouteId, partitionNearbyRoutes, taipeiClock, type NearbySort } from "@/lib/stop-timing";
 import { readNearbySort, writeNearbySort } from "@/lib/nearby-sort";
 import { track } from "@vercel/analytics";
-import { ACCURACY_WARNING_METERS, clearLocationSession, getLocationSession, setLocationSession, useLocationSession } from "@/lib/user-location";
+import { ACCURACY_WARNING_METERS, clearLocationSession, clearPendingStopFocus, getLocationSession, peekPendingStopFocus, setLocationSession, setPendingStopFocus, useLocationSession } from "@/lib/user-location";
 
 const RouteMap = dynamic(() => import("./route-map"), { ssr: false, loading: () => <div className="map-loading"><span className="spinner" />正在準備地圖…</div> });
 
@@ -80,12 +80,19 @@ export default function RouteExplorer({
   const [district, setDistrict] = useState(initialRoute?.district ?? initialDistrict);
   const [routes, setRoutes] = useState<RouteSummary[]>([]);
   const [route, setRoute] = useState<GarbageRoute | null>(initialRoute);
-  const [selectedStop, setSelectedStop] = useState<GarbageStop | null>(initialRoute?.stops[0] ?? null);
+  // A focus set by selectRoute just before navigating here (see lib/user-location.ts); peeked, not
+  // consumed, so Strict Mode's double initializer call sees the same value. Cleared after mount.
+  const [initialFocus] = useState(() => initialRoute ? peekPendingStopFocus(initialRoute.id) : null);
+  const [selectedStop, setSelectedStop] = useState<GarbageStop | null>(() => {
+    if (!initialRoute) return null;
+    return (initialFocus && initialRoute.stops.find((stop) => stop.id === initialFocus.stopId)) ?? initialRoute.stops[0] ?? null;
+  });
   const [query, setQuery] = useState(initialQuery);
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
   const [loadingRoutes, setLoadingRoutes] = useState(true);
   const [error, setError] = useState(invalidSharedPath ? "分享的路線已失效，請重新選擇路線。" : "");
-  const [mobileStopOpen, setMobileStopOpen] = useState(false);
+  const [mobileStopOpen, setMobileStopOpen] = useState(() => Boolean(initialFocus?.showDetails && selectedStop && selectedStop.id === initialFocus.stopId));
+  useEffect(() => { clearPendingStopFocus(); }, []);
   const [mapFailed, setMapFailed] = useState(false);
   // Keep the mobile map visible on entry; users open the search sheet explicitly.
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
@@ -292,6 +299,8 @@ export default function RouteExplorer({
       if (!response.ok) throw new Error(result.error?.message);
       const detail = result.data as GarbageRoute;
       const focused = focus ? detail.stops.find((stop) => stop.id === focus.stopId) : undefined;
+      // Also stash the focus for the remount that happens when this push leaves the home page.
+      setPendingStopFocus(focused ? { routeId: detail.id, stopId: focused.id, showDetails: Boolean(focus?.showDetails) } : null);
       setRoute(detail);
       setSelectedStop(focused ?? detail.stops[0] ?? null);
       setMobileStopOpen(Boolean(focused && focus?.showDetails));

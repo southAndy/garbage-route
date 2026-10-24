@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { accuracyRingRadii, clearLocationSession, getLocationSession, nearestStopDistanceMeters, setLocationSession, subscribeLocationSession, type LocationSession } from "./user-location";
+import { accuracyRingRadii, clearLocationSession, clearPendingStopFocus, getLocationSession, nearestStopDistanceMeters, peekPendingStopFocus, setLocationSession, setPendingStopFocus, subscribeLocationSession, type LocationSession } from "./user-location";
 import type { GarbageStop } from "./types";
 
 const session: LocationSession = {
@@ -28,6 +28,17 @@ describe("location session store", () => {
     unsubscribe();
     setLocationSession(session);
     expect(listener).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("pending stop focus", () => {
+  it("只回傳目標路線的聚焦站，讀取不會清除，清除後為 null", () => {
+    setPendingStopFocus({ routeId: "r1", stopId: "s7", showDetails: true });
+    expect(peekPendingStopFocus("r1")).toEqual({ routeId: "r1", stopId: "s7", showDetails: true });
+    expect(peekPendingStopFocus("r1")).not.toBeNull();
+    expect(peekPendingStopFocus("r2")).toBeNull();
+    clearPendingStopFocus();
+    expect(peekPendingStopFocus("r1")).toBeNull();
   });
 });
 
