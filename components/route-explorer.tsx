@@ -27,6 +27,8 @@ import { ACCURACY_WARNING_METERS, clearLocationSession, clearPendingStopFocus, g
 const RouteMap = dynamic(() => import("./route-map"), { ssr: false, loading: () => <div className="map-loading"><span className="spinner" />正在準備地圖…</div> });
 
 const mobileQuery = "(max-width: 760px)";
+/** Longer than the gap between a mobile blur and the click it precedes, shorter than a noticeable pause. */
+const SEARCH_COLLAPSE_DELAY_MS = 350;
 function subscribeToViewport(onChange: () => void) {
   const media = window.matchMedia(mobileQuery);
   media.addEventListener("change", onChange);
@@ -96,6 +98,20 @@ export default function RouteExplorer({
   const [mapFailed, setMapFailed] = useState(false);
   // Keep the mobile map visible on entry; users open the search sheet explicitly.
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+  // While typing, the mobile sheet takes the whole visible viewport. It must not shrink back the
+  // instant the input blurs: iOS blurs before dispatching click, so a tap on "use my location" or a
+  // result card would otherwise land on whatever moved under the finger. Collapse after a short delay.
+  const [searchExpanded, setSearchExpanded] = useState(false);
+  const collapseTimer = useRef<number | null>(null);
+  const expandSearch = () => {
+    if (collapseTimer.current !== null) { window.clearTimeout(collapseTimer.current); collapseTimer.current = null; }
+    setSearchExpanded(true);
+  };
+  const collapseSearchSoon = () => {
+    if (collapseTimer.current !== null) window.clearTimeout(collapseTimer.current);
+    collapseTimer.current = window.setTimeout(() => { collapseTimer.current = null; setSearchExpanded(false); }, SEARCH_COLLAPSE_DELAY_MS);
+  };
+  useEffect(() => () => { if (collapseTimer.current !== null) window.clearTimeout(collapseTimer.current); }, []);
   // Nearby mode replaces the district result list until the user types or changes area.
   // It lives in a module store so it survives the remount when navigating into a route page.
   const locationSession = useLocationSession();
@@ -367,7 +383,7 @@ export default function RouteExplorer({
             <span className="sheet-grip" aria-hidden="true" />
             <span className="sheet-label"><strong>{district || CITY_NAMES[city]}</strong><span>{mobilePanelOpen ? "收合路線搜尋" : route ? "搜尋其他路線" : "搜尋垃圾車路線"}</span><span aria-hidden="true">{mobilePanelOpen ? "⌄" : "⌃"}</span></span>
           </button>
-          <div id="route-search-panel" className="search-panel-content" hidden={isMobile && !mobilePanelOpen}>
+          <div id="route-search-panel" className={`search-panel-content ${searchExpanded ? "is-typing" : ""}`} hidden={isMobile && !mobilePanelOpen}>
           {(!isMobile || mobilePanelOpen) && <>
           <div className="filters">
             <div className="step-label"><span>01</span> 選擇查詢範圍</div>
@@ -381,7 +397,7 @@ export default function RouteExplorer({
               </select>
             </div>
             <label className="field-label route-search-label" htmlFor="route-search">搜尋{district || CITY_NAMES[city]}的路名或停靠點</label>
-            <div className="search-wrap"><span aria-hidden="true">⌕</span><input ref={searchInputRef} id="route-search" value={query} onChange={(event) => { if (nearby) clearNearby(); setQuery(event.target.value); }} placeholder={district === "士林區" ? "例如：延平北路、社子" : "輸入路名、地點或路線名稱"} /></div>
+            <div className="search-wrap"><span aria-hidden="true">⌕</span><input ref={searchInputRef} id="route-search" value={query} onFocus={expandSearch} onBlur={collapseSearchSoon} onChange={(event) => { if (nearby) clearNearby(); setQuery(event.target.value); }} placeholder={district === "士林區" ? "例如：延平北路、社子" : "輸入路名、地點或路線名稱"} /></div>
             <div className="locate-row">
               <TrackedLocationButton source="route_search" type="button" className="locate-button" onClick={locate} disabled={locateState === "locating" || geoPermission === "unsupported"} aria-busy={locateState === "locating"} aria-describedby="locate-hint">
                 <span aria-hidden="true">{locateState === "locating" ? <span className="spinner locate-spinner" /> : "◎"}</span>

@@ -342,7 +342,7 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
   .filters .select-wrap,.filters .search-wrap { display:block; width:100%; margin-left:0; }
   .sidebar .search-panel-content { height:min(65dvh,calc(var(--viewport-height,100dvh) - 180px)); }
   /* Give typing the visible viewport; a short bottom sheet clips the stacked filters. */
-  .sidebar .search-panel-content:has(#route-search:focus) {
+  .sidebar .search-panel-content.is-typing {
     position:fixed;
     top:calc(var(--viewport-top,0px) + 8px);
     bottom:auto;
@@ -352,10 +352,10 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
     overscroll-behavior:contain;
     scroll-padding:12px;
   }
-  .search-panel-content:has(#route-search:focus) > .filters,
-  .search-panel-content:has(#route-search:focus) > .route-results { flex-shrink:0; }
-  .search-panel-content:has(#route-search:focus) .route-list { overflow:visible; }
-  body:has(#route-search:focus) .mobile-survey-invite { visibility:hidden; }
+  .search-panel-content.is-typing > .filters,
+  .search-panel-content.is-typing > .route-results { flex-shrink:0; }
+  .search-panel-content.is-typing .route-list { overflow:visible; }
+  body:has(.search-panel-content.is-typing) .mobile-survey-invite { visibility:hidden; }
   .route-search-shortcut { margin-top:4px; }
   .stop-popup { max-height:calc(100% - 290px); }
 }
