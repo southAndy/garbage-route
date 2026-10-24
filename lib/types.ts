@@ -59,6 +59,17 @@ export interface GarbageRoute {
   };
 }
 
+/** A stop that matched a text search, with what stop-timing needs to say whether it is still coming. */
+export interface MatchedStop {
+  stopId: string;
+  sequence: number;
+  name: string;
+  scheduledTime: string | null;
+  serviceDayOffset: number;
+  /** Garbage-collection weekdays (index 0 = Sunday); null when the source has none. */
+  serviceDays: boolean[] | null;
+}
+
 export interface RouteSummary {
   id: string;
   cityCode: CityCode;
@@ -71,4 +82,6 @@ export interface RouteSummary {
   startStopName: string | null;
   endStopName: string | null;
   stopCount: number;
+  /** Only on text-search results: the stops whose name, address or village matched, in route order. */
+  matches?: { count: number; stops: MatchedStop[] };
 }

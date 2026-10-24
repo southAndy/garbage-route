@@ -19,7 +19,9 @@ import { displayTime, scheduleText } from "@/lib/schedule-display";
 import { formatDistance, GEOLOCATION_OPTIONS, locateErrorState, locateMessage, queryGeolocationPermission, roundForRequest, type GeolocationPermission, type LocateState } from "@/lib/geolocation";
 import type { NearbyResult, NearbyRoute } from "@/lib/nearby-search";
 import NearbyRouteCard from "./nearby-route-card";
-import { closestUpcomingRouteId, partitionNearbyRoutes, taipeiClock, type NearbySort } from "@/lib/stop-timing";
+import SearchRouteCard from "./search-route-card";
+import { closestUpcomingRouteId, partitionNearbyRoutes, partitionSearchResults, routeSpanLabel, routeSpanStatus, taipeiClock, type NearbySort } from "@/lib/stop-timing";
+import { dismissNearbyHint, hasSeenLocateExplainer, isNearbyHintDismissed, markLocateExplainerSeen } from "@/lib/search-hints";
 import { readNearbySort, writeNearbySort } from "@/lib/nearby-sort";
 import { readListScroll, saveListScroll } from "@/lib/list-scroll";
 import { track } from "@vercel/analytics";
@@ -28,8 +30,6 @@ import { ACCURACY_WARNING_METERS, clearLocationSession, clearPendingStopFocus, g
 const RouteMap = dynamic(() => import("./route-map"), { ssr: false, loading: () => <div className="map-loading"><span className="spinner" />正在準備地圖…</div> });
 
 const mobileQuery = "(max-width: 760px)";
-/** Longer than the gap between a mobile blur and the click it precedes, shorter than a noticeable pause. */
-const SEARCH_COLLAPSE_DELAY_MS = 350;
 function subscribeToViewport(onChange: () => void) {
   const media = window.matchMedia(mobileQuery);
   media.addEventListener("change", onChange);
@@ -102,20 +102,18 @@ export default function RouteExplorer({
   const [mapFailed, setMapFailed] = useState(false);
   // Keep the mobile map visible on entry; users open the search sheet explicitly.
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
-  // While typing, the mobile sheet takes the whole visible viewport. It must not shrink back the
-  // instant the input blurs: iOS blurs before dispatching click, so a tap on "use my location" or a
-  // result card would otherwise land on whatever moved under the finger. Collapse after a short delay.
-  const [searchExpanded, setSearchExpanded] = useState(false);
-  const collapseTimer = useRef<number | null>(null);
-  const expandSearch = () => {
-    if (collapseTimer.current !== null) { window.clearTimeout(collapseTimer.current); collapseTimer.current = null; }
-    setSearchExpanded(true);
-  };
-  const collapseSearchSoon = () => {
-    if (collapseTimer.current !== null) window.clearTimeout(collapseTimer.current);
-    collapseTimer.current = window.setTimeout(() => { collapseTimer.current = null; setSearchExpanded(false); }, SEARCH_COLLAPSE_DELAY_MS);
-  };
-  useEffect(() => () => { if (collapseTimer.current !== null) window.clearTimeout(collapseTimer.current); }, []);
+  // On mobile the area pickers (city, district) fold away behind a chip once an area is chosen,
+  // so the sticky head stays short enough to leave room for results.
+  const [areaOpen, setAreaOpen] = useState(false);
+  // The pre-permission card shown before the browser's own location prompt (see requestLocate).
+  const [locateExplainerOpen, setLocateExplainerOpen] = useState(false);
+  const explainerRef = useRef<HTMLDivElement>(null);
+  // Read in an effect: the default list renders on the server, where localStorage is unavailable.
+  const [nearbyHintDismissed, setNearbyHintDismissed] = useState(true);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNearbyHintDismissed(isNearbyHintDismissed());
+  }, []);
   // Nearby mode replaces the district result list until the user types or changes area.
   // It lives in a module store so it survives the remount when navigating into a route page.
   const locationSession = useLocationSession();
@@ -131,8 +129,9 @@ export default function RouteExplorer({
   const changeNearbySort = (next: NearbySort) => {
     if (next === nearbySort) return;
     setNearbySort(next); writeNearbySort(next);
-    // Which situation people are in (must dump now vs. willing to wait); analytics never blocks the switch.
-    try { track("nearby_sort_changed", { sort: next, from: nearbySort }); } catch { /* Tracking is optional. */ }
+    // Which situation people are in (must dump now vs. willing to wait). One event per target so
+    // the two counts show side by side in the Vercel events list; analytics never blocks the switch.
+    try { track(next === "time" ? "nearby_sort_time" : "nearby_sort_distance", { from: nearbySort }); } catch { /* Tracking is optional. */ }
   };
   // One result set = one scroll position, so switching district or typing starts at the top
   // while opening a route and coming back (a remount) lands where the user left off.
@@ -160,11 +159,25 @@ export default function RouteExplorer({
     list.scrollTop += cardRect.top - listRect.top - (list.clientHeight - cardRect.height) / 2;
   }, [listKey, loadingRoutes, isMobile, mobilePanelOpen]);
 
+  const listVisible = !isMobile || mobilePanelOpen;
   useEffect(() => {
-    if (!nearby) return;
+    if (!nearby && !listVisible) return;
     const timer = window.setInterval(() => setClockTick((tick) => tick + 1), 60_000);
     return () => window.clearInterval(timer);
-  }, [nearby]);
+  }, [nearby, listVisible]);
+
+  // The open mobile panel is the only thing that scrolls; the document behind it must not.
+  useEffect(() => {
+    if (!isMobile || !mobilePanelOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; };
+  }, [isMobile, mobilePanelOpen]);
+
+  useEffect(() => {
+    if (!locateExplainerOpen) return;
+    explainerRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+  }, [locateExplainerOpen]);
 
   useEffect(() => {
     let status: PermissionStatus | null = null;
@@ -305,6 +318,7 @@ export default function RouteExplorer({
           position: { lat: position.coords.latitude, lng: position.coords.longitude, accuracy: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null, locatedAt: Date.now() },
         });
         setLocateState("ready");
+        dismissNearbyHint(); setNearbyHintDismissed(true);
       } catch {
         setLocateState("failed");
       }
@@ -313,6 +327,30 @@ export default function RouteExplorer({
       if (next === "denied") setGeoPermission("denied");
       setLocateState(next);
     }, GEOLOCATION_OPTIONS);
+  };
+
+  /**
+   * Entry point for every "use my location" control. Touch has no tooltips, so the first request
+   * opens an explainer card instead of the system prompt; a remembered refusal goes straight to the
+   * unblock instructions, and a granted permission (or a previously read card) skips the card.
+   */
+  const requestLocate = async () => {
+    if (locateState === "locating") return;
+    const permission = await queryGeolocationPermission();
+    setGeoPermission(permission);
+    if (permission === "unsupported") { setLocateState("unsupported"); return; }
+    if (permission === "denied") { setLocateState("denied"); return; }
+    if (permission === "granted" || hasSeenLocateExplainer()) { locate(); return; }
+    setLocateExplainerOpen(true);
+  };
+  const confirmLocate = () => {
+    markLocateExplainerSeen();
+    setLocateExplainerOpen(false);
+    locate();
+  };
+  const focusSearchInput = () => {
+    searchInputRef.current?.focus({ preventScroll: true });
+    searchInputRef.current?.scrollIntoView({ block: "nearest", behavior: "auto" });
   };
 
   const selectCity = (nextCity: CityCode) => {
@@ -326,6 +364,7 @@ export default function RouteExplorer({
 
   const selectDistrict = (nextDistrict: string) => {
     clearNearby();
+    setAreaOpen(false);
     setDistrict(nextDistrict); setRoute(null); setSelectedStop(null); setError("");
     const params = new URLSearchParams({ city, district: nextDistrict });
     if (query) params.set("q", query);
@@ -360,15 +399,17 @@ export default function RouteExplorer({
     }
   };
 
-  // A nearby card is one link; the stop rows inside it carry data-stop-id so a tap
-  // on a row lands on that stop, while a tap elsewhere lands on the closest stop.
-  const selectNearbyRoute = (event: MouseEvent<HTMLAnchorElement>, item: NearbyRoute) => {
+  // A nearby or search card is one link; the stop rows inside it carry data-stop-id so a tap
+  // on a row lands on that stop, while a tap elsewhere lands on `fallbackStopId` (the closest
+  // or the next matched stop).
+  const selectCardRoute = (event: MouseEvent<HTMLAnchorElement>, item: RouteSummary, fallbackStopId?: string) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
     const row = (event.target as HTMLElement).closest<HTMLElement>("[data-stop-id]");
-    const stopId = row?.dataset.stopId ?? item.nearby.stops[0]?.stopId;
+    const stopId = row?.dataset.stopId ?? fallbackStopId;
     selectRoute(item, stopId ? { stopId, showDetails: Boolean(row) } : undefined);
   };
+  const selectNearbyRoute = (event: MouseEvent<HTMLAnchorElement>, item: NearbyRoute) => selectCardRoute(event, item, item.nearby.stops[0]?.stopId);
 
   const selectedIndex = route && selectedStop ? route.stops.findIndex((stop) => stop.id === selectedStop.id) : -1;
   const chooseStop = useCallback((stop: GarbageStop) => {
@@ -390,9 +431,12 @@ export default function RouteExplorer({
     searchInputRef.current?.select();
   };
   const handleMapError = useCallback(() => setMapFailed(true), []);
-  // Nearby mode only exists after a click, so reading the clock here never runs on the server.
+  // Routes and nearby results only arrive after client-side fetches, so every render that reads
+  // the clock happens in the browser and the server HTML (empty list) never disagrees with it.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const nearbyGroups = useMemo(() => nearby ? { clock: taipeiClock(), ...partitionNearbyRoutes(nearby.routes, taipeiClock(), nearbySort) } : null, [nearby, clockTick, nearbySort]);
+  const clock = useMemo(() => taipeiClock(), [routes, nearby, clockTick]);
+  const nearbyGroups = useMemo(() => nearby ? partitionNearbyRoutes(nearby.routes, clock, nearbySort) : null, [nearby, clock, nearbySort]);
+  const searchGroups = useMemo(() => !nearby && debouncedQuery.trim() ? partitionSearchResults(routes, clock) : null, [nearby, debouncedQuery, routes, clock]);
   // When ordering by time, flag the closest card so people who would rather wait can still spot it.
   const closestRouteId = nearbySort === "time" && nearbyGroups ? closestUpcomingRouteId(nearbyGroups.upcoming) : null;
   const validCount = useMemo(() => route?.stops.filter((stop) => stop.coordinateStatus === "valid").length ?? 0, [route]);
@@ -413,37 +457,72 @@ export default function RouteExplorer({
             <span className="sheet-grip" aria-hidden="true" />
             <span className="sheet-label"><strong>{district || CITY_NAMES[city]}</strong><span>{mobilePanelOpen ? "收合路線搜尋" : route ? "搜尋其他路線" : "搜尋垃圾車路線"}</span><span aria-hidden="true">{mobilePanelOpen ? "⌄" : "⌃"}</span></span>
           </button>
-          <div ref={panelRef} id="route-search-panel" className={`search-panel-content ${searchExpanded ? "is-typing" : ""}`} hidden={isMobile && !mobilePanelOpen} onScroll={rememberScroll}>
+          <div ref={panelRef} id="route-search-panel" className="search-panel-content" hidden={isMobile && !mobilePanelOpen} onScroll={rememberScroll}>
           {(!isMobile || mobilePanelOpen) && <>
-          <div className="filters">
-            <div className="step-label"><span>01</span> 選擇查詢範圍</div>
-            <div className="city-tabs" aria-label="城市">
-              {(Object.keys(CITY_NAMES) as CityCode[]).map((code) => <button key={code} className={city === code ? "active" : ""} aria-pressed={city === code} onClick={() => selectCity(code)}>{CITY_NAMES[code]}</button>)}
+          <div className="search-head">
+            <div className="search-head-top">
+              <button type="button" className="area-chip" aria-expanded={areaOpen} aria-controls="area-filters" onClick={() => setAreaOpen((open) => !open)}>{CITY_NAMES[city]}・{district || "選擇行政區"}<span aria-hidden="true">⌄</span></button>
+              <button type="button" className="search-close" aria-label="關閉搜尋，回到地圖" onClick={() => setMobilePanelOpen(false)}>×</button>
             </div>
-            <label className="field-label" htmlFor="district">行政區</label>
-            <div className={`select-wrap ${loadingDistricts ? "is-loading" : ""}`}>
-              <select id="district" value={loadingDistricts || districts.length === 0 ? "" : district} disabled={loadingDistricts || districts.length === 0} aria-busy={loadingDistricts} onChange={(event) => selectDistrict(event.target.value)}>
-                {loadingDistricts ? <option value="">正在載入行政區…</option> : districts.length === 0 ? <option value="">{districtsFailed ? "行政區載入失敗" : "暫無可選行政區"}</option> : districts.map((item) => <option value={item.name} key={item.name}>{item.name}（{item.routeCount} 條）</option>)}
-              </select>
+            <div id="area-filters" className={`area-filters ${areaOpen || !district ? "is-open" : ""}`}>
+              <div className="city-tabs" aria-label="城市">
+                {(Object.keys(CITY_NAMES) as CityCode[]).map((code) => <button key={code} className={city === code ? "active" : ""} aria-pressed={city === code} onClick={() => selectCity(code)}>{CITY_NAMES[code]}</button>)}
+              </div>
+              <label className="field-label" htmlFor="district">行政區</label>
+              <div className={`select-wrap ${loadingDistricts ? "is-loading" : ""}`}>
+                <select id="district" value={loadingDistricts || districts.length === 0 ? "" : district} disabled={loadingDistricts || districts.length === 0} aria-busy={loadingDistricts} onChange={(event) => selectDistrict(event.target.value)}>
+                  {loadingDistricts ? <option value="">正在載入行政區…</option> : districts.length === 0 ? <option value="">{districtsFailed ? "行政區載入失敗" : "暫無可選行政區"}</option> : districts.map((item) => <option value={item.name} key={item.name}>{item.name}（{item.routeCount} 條）</option>)}
+                </select>
+              </div>
             </div>
-            <label className="field-label route-search-label" htmlFor="route-search">搜尋{district || CITY_NAMES[city]}的路名或停靠點</label>
-            <div className="search-wrap"><span aria-hidden="true">⌕</span><input ref={searchInputRef} id="route-search" value={query} onFocus={expandSearch} onBlur={collapseSearchSoon} onChange={(event) => { if (nearby) clearNearby(); setQuery(event.target.value); }} placeholder={district === "士林區" ? "例如：延平北路、社子" : "輸入路名、地點或路線名稱"} /></div>
-            <div className={`locate-row ${nearby ? "is-active" : ""}`}>
-              <TrackedLocationButton source="route_search" type="button" className={`locate-button ${nearby ? "is-active" : ""}`} onClick={locate} disabled={locateState === "locating" || geoPermission === "unsupported"} aria-busy={locateState === "locating"} aria-describedby="locate-hint">
-                <span aria-hidden="true">{locateState === "locating" ? <span className="spinner locate-spinner" /> : nearby ? "◉" : "◎"}</span>
-                {locateState === "locating" ? "定位中…" : nearby ? "已使用目前位置" : "使用目前位置"}
+            <div className="search-row">
+              <label className="sr-only" htmlFor="route-search">搜尋{district || CITY_NAMES[city]}的路名或停靠點</label>
+              <div className="search-wrap">
+                <span aria-hidden="true">⌕</span>
+                <input ref={searchInputRef} id="route-search" value={query} onChange={(event) => { if (nearby) clearNearby(); setQuery(event.target.value); }} placeholder={district === "士林區" ? "例如：延平北路、社子" : "輸入路名或地點，例如 永平路"} />
+                {query && <button type="button" className="search-clear" aria-label="清除搜尋" onClick={() => { setQuery(""); focusSearchInput(); }}>×</button>}
+              </div>
+              <TrackedLocationButton source="route_search" type="button" className={`locate-button ${nearby ? "is-active" : ""} ${!nearby && (locateState === "denied" || geoPermission === "denied") ? "is-blocked" : ""}`} onClick={requestLocate} disabled={locateState === "locating" || geoPermission === "unsupported"} aria-busy={locateState === "locating"} aria-describedby={locateMessage(locateState, userAgent) ? "locate-message" : undefined}>
+                {locateState === "locating" ? <span className="spinner locate-spinner" aria-hidden="true" /> : <svg aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="10" cy="10" r="6" /><path d="M10 1v3M10 16v3M1 10h3M16 10h3" />{nearby && <circle cx="10" cy="10" r="2.2" fill="currentColor" stroke="none" />}{!nearby && (locateState === "denied" || geoPermission === "denied") && <path d="M3 3l14 14" />}</svg>}
+                {locateState === "locating" ? "定位中…" : nearby ? "已定位" : locateState === "denied" || geoPermission === "denied" ? "定位已封鎖" : "用目前位置"}
               </TrackedLocationButton>
-              {nearby
-                ? <><small id="locate-hint">附近路線已依你的位置顯示</small><button type="button" className="clear-nearby" onClick={clearNearby}>清除定位</button></>
-                : <small id="locate-hint">僅用於查詢附近路線，不會儲存位置</small>}
             </div>
-            {locateMessage(locateState, userAgent) && <p className={`locate-message ${locateState === "denied" ? "is-blocked" : ""}`} role="status">{locateMessage(locateState, userAgent)}</p>}
+            {locateMessage(locateState, userAgent) && <div id="locate-message" className={`locate-message ${locateState === "denied" ? "is-blocked" : ""}`} role="status">
+              <p>{locateMessage(locateState, userAgent)}</p>
+              {locateState !== "unsupported" && <div className="locate-message-actions">
+                <button type="button" onClick={requestLocate}>{locateState === "denied" ? "改好了，再試一次" : "再試一次"}</button>
+                <button type="button" className="is-secondary" onClick={focusSearchInput}>改用路名搜尋</button>
+              </div>}
+            </div>}
+            <div className="results-meta">
+              {nearby ? <>
+                <span>你附近 {nearby.radius >= 1000 ? "1 公里" : `${nearby.radius} 公尺`}內有 <b>{nearby.routes.length}</b> 條路線</span>
+                <button type="button" className="clear-nearby" onClick={clearNearby}>清除定位</button>
+              </> : loadingRoutes ? <span>查詢中…</span> : searchGroups ? <>
+                <span><b>{routes.length}</b> 條路線經過「{debouncedQuery.trim()}」{searchGroups.upcoming.length > 1 && "・依最快抵達"}</span>
+                <Link href="/collection-points">限時收受點 →</Link>
+              </> : <>
+                <span>{district || CITY_NAMES[city]} {routes.length} 條路線・依名稱排序</span>
+                <Link href="/collection-points">錯過垃圾車？限時收受點 →</Link>
+              </>}
+            </div>
           </div>
 
           <div className="route-results">
+            {locateExplainerOpen && <>
+              <div className="results-scrim" onClick={() => setLocateExplainerOpen(false)} />
+              <div ref={explainerRef} id="locate-explainer" className="locate-explainer" role="dialog" aria-modal="true" aria-labelledby="locate-explainer-title" onKeyDown={(event) => { if (event.key === "Escape") setLocateExplainerOpen(false); }}>
+                <h2 id="locate-explainer-title">用目前位置找附近的垃圾車</h2>
+                <p>會以四捨五入後的座標查詢 <b>500 公尺內</b>的站點與表定時間。位置<b>不會儲存</b>，只用於這次查詢。</p>
+                <small>按「允許定位」後，瀏覽器會再問一次是否允許這個網站取得位置。</small>
+                <div className="locate-explainer-actions">
+                  <button type="button" className="is-primary" onClick={confirmLocate}>允許定位</button>
+                  <button type="button" className="is-secondary" onClick={() => setLocateExplainerOpen(false)}>先不要</button>
+                </div>
+              </div>
+            </>}
             {nearby ? <>
-              <div className="results-heading"><div className="step-label"><span>02</span> 附近的路線</div><button type="button" className="clear-nearby" onClick={clearNearby}>清除定位</button></div>
-              <p className="nearby-summary">你附近 {nearby.radius >= 1000 ? "1 公里" : `${nearby.radius} 公尺`}內有 {nearby.routes.length} 條路線{nearby.resolved ? `，位置約在${CITY_NAMES[nearby.resolved.city]}${nearby.resolved.district}` : ""}。{nearby.expanded && "500 公尺內沒有站點，已擴大到 1 公里。"}</p>
+              <p className="nearby-summary">{nearby.resolved ? `位置約在${CITY_NAMES[nearby.resolved.city]}${nearby.resolved.district}。` : ""}{nearby.expanded && "500 公尺內沒有站點，已擴大到 1 公里。"}</p>
               {nearby.routes.length > 1 && <div className="nearby-sort" role="group" aria-label="附近路線排序">
                 <button type="button" className={nearbySort === "time" ? "active" : ""} aria-pressed={nearbySort === "time"} onClick={() => changeNearbySort("time")}>最快抵達</button>
                 <button type="button" className={nearbySort === "distance" ? "active" : ""} aria-pressed={nearbySort === "distance"} onClick={() => changeNearbySort("distance")}>最近距離</button>
@@ -452,32 +531,53 @@ export default function RouteExplorer({
               {userPosition?.accuracy != null && userPosition.accuracy > ACCURACY_WARNING_METERS && <p className="nearby-accuracy-warning" role="status">定位誤差約 {formatDistance(userPosition.accuracy)}，附近結果僅供參考，建議改用路名搜尋確認。</p>}
               {nearby.routes.length === 0 || !nearbyGroups ? <div className="empty-state"><span>1 公里內沒有垃圾車站點</span><p>請改用行政區與路名搜尋</p>{nearby.resolved && <FeedbackButton label="附近應該有站點？告訴我們" context={{ entry: "empty_nearby", city: nearby.resolved.city, district: nearby.resolved.district, radius: String(nearby.radius) }} summary={`${CITY_NAMES[nearby.resolved.city]}・${nearby.resolved.district}・附近 ${nearby.radius} 公尺無結果`} />}</div> : (
                 <div ref={listRef} className="route-list" onScroll={rememberScroll}>
-                  {nearbyGroups.upcoming.length === 0 && <p className="nearby-all-passed">附近路線今天的表定時間都已過，或今日不收。以下列表可供規劃其他日子。</p>}
+                  {nearbyGroups.upcoming.length === 0 && <p className="nearby-all-passed">附近路線今天的表定時間都已過，或今日不收。<Link href="/collection-points">找限時收受點 →</Link> 以下列表可供規劃其他日子。</p>}
                   {nearbyGroups.upcoming.map(({ route: item, timing }) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card nearby-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => selectNearbyRoute(event, item)}>
-                    <NearbyRouteCard item={item} clock={nearbyGroups.clock} timing={timing} closest={item.id === closestRouteId} />
+                    <NearbyRouteCard item={item} clock={clock} timing={timing} closest={item.id === closestRouteId} />
                   </Link>)}
                   {nearbyGroups.later.length > 0 && <details className="nearby-later" open={nearbyGroups.upcoming.length === 0}>
                     <summary>今天已過或不收的 {nearbyGroups.later.length} 條路線</summary>
                     {nearbyGroups.later.map(({ route: item, timing }) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card nearby-card is-later ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => selectNearbyRoute(event, item)}>
-                      <NearbyRouteCard item={item} clock={nearbyGroups.clock} timing={timing} />
+                      <NearbyRouteCard item={item} clock={clock} timing={timing} />
                     </Link>)}
                   </details>}
                   <p className="results-note">以上為表定清運時間與站點距離，非車輛即時位置。「已過表定時間」不代表車輛已離開，假日或臨時調整請以清潔隊公告為準。</p>
                 </div>
               )}
             </> : <>
-            <div className="results-heading"><div className="step-label"><span>02</span> 選擇路線</div><small>{loadingRoutes ? "查詢中…" : `${routes.length} 條結果`}</small></div>
             {error && <div className="alert" role="alert">{error}</div>}
-            {loadingRoutes ? <div className="routes-loading" role="status"><span className="spinner" aria-hidden="true" /><span>正在載入路線資料…</span></div> : routes.length === 0 ? !error && <div className="empty-state"><span>沒有相符路線</span><p>試試其他關鍵字或行政區</p>{district && <FeedbackButton label="找不到要找的地點？告訴我們" context={{ entry: "empty_search", city, district, query: debouncedQuery }} summary={`${CITY_NAMES[city]}・${district}${debouncedQuery ? `・搜尋：${debouncedQuery}` : ""}`} />}</div> : (
+            {loadingRoutes ? <div className="routes-loading" role="status"><span className="spinner" aria-hidden="true" /><span>正在載入路線資料…</span></div> : routes.length === 0 ? !error && <div className="empty-state"><span>沒有相符路線</span><p>試試其他關鍵字或行政區</p>{district && <FeedbackButton label="找不到要找的地點？告訴我們" context={{ entry: "empty_search", city, district, query: debouncedQuery }} summary={`${CITY_NAMES[city]}・${district}${debouncedQuery ? `・搜尋：${debouncedQuery}` : ""}`} />}</div> : searchGroups ? (
               <div ref={listRef} className="route-list" onScroll={rememberScroll}>
-                {routes.map((item) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); selectRoute(item); }}>
-                  <span className="route-card-top"><strong>{item.routeName}{item.tripLabel ? `・${item.tripLabel}` : ""}</strong><i>›</i></span>
-                  <span className="route-time">{item.firstArrivalTime ?? "--:--"}<em>—</em>{item.lastArrivalTime ?? "--:--"}</span>
-                  <span className="route-card-bottom">
-                    <span className="route-meta">{item.startStopName ?? "起點未提供"} → {item.endStopName ?? "終點未提供"}</span>
-                    <span className="route-count">共 {item.stopCount} 站</span>
-                  </span>
+                {searchGroups.upcoming.length === 0 && <p className="nearby-all-passed">經過「{debouncedQuery.trim()}」的路線今天表定時間都已過，或今日不收。<Link href="/collection-points">找限時收受點 →</Link> 以下列表可供規劃其他日子。</p>}
+                {searchGroups.upcoming.map(({ route: item, timing }, index) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card search-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => selectCardRoute(event, item, item.matches?.stops[Math.max(timing.nextIndex, 0)]?.stopId)}>
+                  <SearchRouteCard item={item} query={debouncedQuery.trim()} clock={clock} timing={timing} fastest={index === 0 && searchGroups.upcoming.length > 1 && timing.minutesUntilNext !== null} />
                 </Link>)}
+                {searchGroups.later.length > 0 && <details className="nearby-later" open={searchGroups.upcoming.length === 0}>
+                  <summary>今天已過或不收的 {searchGroups.later.length} 條路線</summary>
+                  {searchGroups.later.map(({ route: item, timing }) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card search-card is-later ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => selectCardRoute(event, item, item.matches?.stops[0]?.stopId)}>
+                    <SearchRouteCard item={item} query={debouncedQuery.trim()} clock={clock} timing={timing} />
+                  </Link>)}
+                </details>}
+                <p className="results-note">以上為表定清運時間，非車輛即時位置。「已過表定時間」不代表車輛已離開，假日或臨時調整請以清潔隊公告為準。</p>
+              </div>
+            ) : (
+              <div ref={listRef} className="route-list" onScroll={rememberScroll}>
+                {!nearbyHintDismissed && geoPermission !== "denied" && geoPermission !== "unsupported" && locateState !== "denied" && <div className="nearby-hint">
+                  <button type="button" className="nearby-hint-body" onClick={requestLocate}><strong>不知道自己是哪條路線？</strong><span>用目前位置找 500 公尺內的站 →</span></button>
+                  <button type="button" className="nearby-hint-close" aria-label="不再顯示這個提示" onClick={() => { dismissNearbyHint(); setNearbyHintDismissed(true); }}>×</button>
+                </div>}
+                {routes.map((item) => {
+                  const span = routeSpanStatus(item, clock);
+                  const label = routeSpanLabel(item, clock);
+                  return <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); selectRoute(item); }}>
+                    <span className="route-card-top"><strong>{item.routeName}{item.tripLabel ? `・${item.tripLabel}` : ""}</strong>{label && <span className={`route-status ${span === "running" ? "is-upcoming" : span === "ended" ? "is-passed" : ""}`}>{label}</span>}<i>›</i></span>
+                    <span className="route-time">{item.firstArrivalTime ?? "--:--"}<em>—</em>{item.lastArrivalTime ?? "--:--"}</span>
+                    <span className="route-card-bottom">
+                      <span className="route-meta">{item.startStopName ?? "起點未提供"} → {item.endStopName ?? "終點未提供"}</span>
+                      <span className="route-count">共 {item.stopCount} 站</span>
+                    </span>
+                  </Link>;
+                })}
               </div>
             )}
             </>}

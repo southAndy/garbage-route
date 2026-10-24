@@ -4,7 +4,8 @@ import suspiciousCoordinatesData from "@/data/suspicious-coordinates.json";
 import type { SuspiciousCoordinateReport } from "./coordinate-quality";
 import { createNearbyIndex, searchNearby, type GeoPoint, type NearbyIndex, type NearbyRadius } from "./nearby-search";
 import { toSummary } from "./route-summary";
-import type { CityCode, GarbageRoute, RouteCoordinateWarning } from "./types";
+import { searchRoute } from "./route-search";
+import type { CityCode, GarbageRoute, RouteCoordinateWarning, RouteSummary } from "./types";
 
 export { CITY_NAMES, cityPath, districtPath, parseCityCode, routePath } from "./paths";
 
@@ -53,20 +54,12 @@ export function getDistricts(city: CityCode) {
   return [...counts.values()].sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
 }
 
-export function findRoutes(city: CityCode, district: string, query = "") {
-  const needle = query.trim().toLocaleLowerCase("zh-Hant");
+/** Routes of a district; with a query, only those whose name or stops match, each carrying its matched stops. */
+export function findRoutes(city: CityCode, district: string, query = ""): RouteSummary[] {
   return routes
     .filter((route) => route.cityCode === city && route.district === district)
-    .filter((route) => {
-      if (!needle) return true;
-      const searchable = [
-        route.routeName,
-        route.tripLabel,
-        ...route.stops.flatMap((stop) => [stop.name, stop.address, stop.village]),
-      ].filter(Boolean).join(" ").toLocaleLowerCase("zh-Hant");
-      return searchable.includes(needle);
-    })
-    .map(toSummary);
+    .map((route) => searchRoute(route, query))
+    .filter((summary): summary is RouteSummary => summary !== null);
 }
 
 let nearbyIndex: NearbyIndex | null = null;

@@ -1,4 +1,5 @@
 import type { NearbyRoute } from "./nearby-search";
+import type { RouteSummary } from "./types";
 
 export type StopTimeStatus = "upcoming" | "passed" | "notToday" | "unknown";
 
@@ -114,4 +115,73 @@ export function stopStatusLabel(status: StopTimeStatus): string | null {
     case "unknown": return "清運日未提供";
     default: return null;
   }
+}
+
+export type RouteSpanStatus = "running" | "upcoming" | "ended" | "unknown";
+
+/**
+ * Where a route's whole scheduled span sits relative to now. A summary carries no service
+ * days, so this only compares clock times; the label stays about the timetable, not the truck.
+ */
+export function routeSpanStatus(route: { firstArrivalTime: string | null; lastArrivalTime: string | null }, clock: TaipeiClock): RouteSpanStatus {
+  const first = parseTime(route.firstArrivalTime);
+  const last = parseTime(route.lastArrivalTime);
+  if (first === null || last === null) return "unknown";
+  if (clock.minutes < first) return "upcoming";
+  if (clock.minutes > last) return "ended";
+  return "running";
+}
+
+export function routeSpanLabel(route: { firstArrivalTime: string | null; lastArrivalTime: string | null }, clock: TaipeiClock): string | null {
+  switch (routeSpanStatus(route, clock)) {
+    case "running": return "行駛中";
+    case "upcoming": return `${(parseTime(route.firstArrivalTime) ?? 0) >= 17 * 60 ? "今晚" : "今天"} ${route.firstArrivalTime} 起`;
+    case "ended": return "已過表定時間";
+    default: return null;
+  }
+}
+
+export interface SearchRouteTiming {
+  status: StopTimeStatus;
+  /** Index into `matches.stops` of the first stop still coming; -1 when none is. */
+  nextIndex: number;
+  minutesUntilNext: number | null;
+}
+
+/**
+ * Timing of a text-search result from its matched stops: the first one still ahead is the
+ * stop the card should lead with. A route that matched by name only falls back to its span.
+ */
+export function searchRouteTiming(route: RouteSummary, clock: TaipeiClock): SearchRouteTiming {
+  const stops = route.matches?.stops ?? [];
+  if (stops.length === 0) {
+    const span = routeSpanStatus(route, clock);
+    if (span === "unknown") return { status: "unknown", nextIndex: -1, minutesUntilNext: null };
+    if (span === "ended") return { status: "passed", nextIndex: -1, minutesUntilNext: null };
+    return { status: "upcoming", nextIndex: -1, minutesUntilNext: span === "running" ? 0 : (parseTime(route.firstArrivalTime) ?? 0) - clock.minutes };
+  }
+  for (let index = 0; index < stops.length; index += 1) {
+    const minutes = minutesUntil(stops[index], clock);
+    if (minutes !== null) return { status: "upcoming", nextIndex: index, minutesUntilNext: minutes };
+  }
+  const statuses = stops.map((stop) => classifyStopTime(stop, clock));
+  if (statuses.includes("unknown")) return { status: "unknown", nextIndex: -1, minutesUntilNext: null };
+  return { status: statuses.every((status) => status === "notToday") ? "notToday" : "passed", nextIndex: -1, minutesUntilNext: null };
+}
+
+type TimedSearchRoute = { route: RouteSummary; timing: SearchRouteTiming };
+const byNextArrival = (a: TimedSearchRoute, b: TimedSearchRoute) => (a.timing.minutesUntilNext ?? Infinity) - (b.timing.minutesUntilNext ?? Infinity);
+const byName = (a: TimedSearchRoute, b: TimedSearchRoute) => a.route.routeName.localeCompare(b.route.routeName, "zh-Hant") || (a.route.tripLabel ?? "").localeCompare(b.route.tripLabel ?? "", "zh-Hant");
+
+/** Search results split into those still coming (soonest matched stop first) and the rest (by name). */
+export function partitionSearchResults(routes: RouteSummary[], clock: TaipeiClock) {
+  const upcoming: TimedSearchRoute[] = [];
+  const later: TimedSearchRoute[] = [];
+  for (const route of routes) {
+    const timing = searchRouteTiming(route, clock);
+    (timing.status === "upcoming" || timing.status === "unknown" ? upcoming : later).push({ route, timing });
+  }
+  upcoming.sort((a, b) => byNextArrival(a, b) || byName(a, b));
+  later.sort(byName);
+  return { upcoming, later };
 }

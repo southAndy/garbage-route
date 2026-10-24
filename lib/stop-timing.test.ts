@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { classifyStopTime, closestUpcomingRouteId, minutesUntil, nearbyRouteTiming, parseTime, partitionNearbyRoutes, taipeiClock } from "./stop-timing";
+import { classifyStopTime, closestUpcomingRouteId, minutesUntil, nearbyRouteTiming, parseTime, partitionNearbyRoutes, partitionSearchResults, routeSpanLabel, searchRouteTiming, taipeiClock } from "./stop-timing";
 import type { NearbyRoute } from "./nearby-search";
+import type { MatchedStop, RouteSummary } from "./types";
 
 const everyDay = [true, true, true, true, true, true, true];
 const monWedFri = [false, true, false, true, false, true, false];
@@ -110,5 +111,52 @@ describe("nearbyRouteTiming / partitionNearbyRoutes", () => {
     expect(upcoming[0].route.id).toBe("快到了");
     expect(closestUpcomingRouteId(upcoming)).toBe("晚一點");
     expect(closestUpcomingRouteId(upcoming.slice(0, 1))).toBeNull();
+  });
+});
+
+describe("routeSpanLabel / searchRouteTiming / partitionSearchResults", () => {
+  // Saturday 13:05 Taipei.
+  const satNoon = { weekday: 6, minutes: 13 * 60 + 5 };
+  const serviceDays = [false, true, true, false, true, true, true];
+  function summary(id: string, matches?: RouteSummary["matches"], first: string | null = "12:56", last: string | null = "14:32"): RouteSummary {
+    return { id, cityCode: "NTP", district: "永和區", districtSlug: "yonghe", routeName: id, tripLabel: null, firstArrivalTime: first, lastArrivalTime: last, startStopName: null, endStopName: null, stopCount: 10, matches };
+  }
+  function matched(stopId: string, scheduledTime: string | null, days: boolean[] | null = serviceDays): MatchedStop {
+    return { stopId, sequence: 1, name: stopId, scheduledTime, serviceDayOffset: 0, serviceDays: days };
+  }
+
+  it("整條路線相對於現在的狀態文字", () => {
+    expect(routeSpanLabel(summary("a"), satNoon)).toBe("行駛中");
+    expect(routeSpanLabel(summary("a", undefined, "18:45", "20:25"), satNoon)).toBe("今晚 18:45 起");
+    expect(routeSpanLabel(summary("a", undefined, "13:30", "15:00"), satNoon)).toBe("今天 13:30 起");
+    expect(routeSpanLabel(summary("a", undefined, "08:00", "09:30"), satNoon)).toBe("已過表定時間");
+    expect(routeSpanLabel(summary("a", undefined, null, null), satNoon)).toBeNull();
+  });
+
+  it("搜尋結果以第一個還沒到的匹配站點為準", () => {
+    const timing = searchRouteTiming(summary("a", { count: 3, stops: [matched("s1", "12:57"), matched("s2", "13:08"), matched("s3", "13:31")] }), satNoon);
+    expect(timing).toEqual({ status: "upcoming", nextIndex: 1, minutesUntilNext: 3 });
+    expect(searchRouteTiming(summary("b", { count: 1, stops: [matched("s1", "12:57")] }), satNoon)).toEqual({ status: "passed", nextIndex: -1, minutesUntilNext: null });
+    const weekday = [false, true, true, true, true, true, false];
+    expect(searchRouteTiming(summary("c", { count: 1, stops: [matched("s1", "13:30", weekday)] }), satNoon).status).toBe("notToday");
+    expect(searchRouteTiming(summary("d", { count: 1, stops: [matched("s1", null)] }), satNoon).status).toBe("unknown");
+  });
+
+  it("只有路線名稱符合時退回整條路線的時段", () => {
+    expect(searchRouteTiming(summary("a", { count: 0, stops: [] }), satNoon)).toEqual({ status: "upcoming", nextIndex: -1, minutesUntilNext: 0 });
+    expect(searchRouteTiming(summary("a", { count: 0, stops: [] }, "18:45", "20:25"), satNoon).minutesUntilNext).toBe(5 * 60 + 40);
+    expect(searchRouteTiming(summary("a", { count: 0, stops: [] }, "08:00", "09:00"), satNoon).status).toBe("passed");
+  });
+
+  it("還會到的依最快抵達排序，已過的依名稱排在後面", () => {
+    const routes = [
+      summary("四區午13", { count: 1, stops: [matched("s1", "13:31")] }),
+      summary("三區午7", { count: 1, stops: [matched("s2", "12:57")] }),
+      summary("四區午12", { count: 1, stops: [matched("s3", "13:08")] }),
+      summary("一區午1", { count: 1, stops: [matched("s4", "12:50")] }),
+    ];
+    const { upcoming, later } = partitionSearchResults(routes, satNoon);
+    expect(upcoming.map((item) => item.route.id)).toEqual(["四區午12", "四區午13"]);
+    expect(later.map((item) => item.route.id)).toEqual(["一區午1", "三區午7"]);
   });
 });

@@ -5,7 +5,7 @@ export const NEARBY_RADII = [500, 1000] as const;
 export type NearbyRadius = (typeof NEARBY_RADII)[number];
 export const DEFAULT_NEARBY_RADIUS: NearbyRadius = 500;
 /** Stops shown per route on a nearby result card. */
-export const NEARBY_STOP_PREVIEW_LIMIT = 3;
+export const NEARBY_STOP_PREVIEW_LIMIT = 5;
 /** How many nearest stops vote on which district the user is standing in. */
 export const RESOLVE_SAMPLE_SIZE = 10;
 /** Beyond this distance to the nearest stop we treat the user as outside the service area. */

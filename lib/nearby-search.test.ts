@@ -81,7 +81,7 @@ describe("searchNearby", () => {
     const near = result.routes[0];
     expect(near.nearby.count).toBe(4);
     expect(near.nearby.nearestDistanceMeters).toBe(111);
-    expect(near.nearby.stops.map((item) => item.stopId)).toEqual(["近線-stop-4", "近線-stop-2", "近線-stop-1"]);
+    expect(near.nearby.stops.map((item) => item.stopId)).toEqual(["近線-stop-4", "近線-stop-2", "近線-stop-1", "近線-stop-5"]);
     expect(near.nearby.stops[0]).toEqual({ stopId: "近線-stop-4", name: "近線 第 4 站", scheduledTime: "19:04", serviceDayOffset: 0, distanceMeters: 111, serviceDays: null });
   });
 
