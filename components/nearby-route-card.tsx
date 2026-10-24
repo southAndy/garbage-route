@@ -11,6 +11,9 @@ function stopTime(stop: NearbyRoute["nearby"]["stops"][number]) {
  * Body of a search-result card in nearby mode. Leads with the closest stops
  * and their scheduled times; the whole-route span is demoted to the footer
  * so it is not mistaken for when the truck reaches the user.
+ *
+ * Each stop row carries `data-stop-id`; the enclosing card link reads it on
+ * click so tapping a row opens the route focused on that stop.
  */
 export default function NearbyRouteCard({ item, clock, timing }: { item: NearbyRoute; clock?: TaipeiClock; timing?: NearbyRouteTiming }) {
   const { nearby } = item;
@@ -30,7 +33,7 @@ export default function NearbyRouteCard({ item, clock, timing }: { item: NearbyR
     <ul className="nearby-stops" aria-label="附近的站點">
       {nearby.stops.map((stop) => {
         const status = clock ? classifyStopTime(stop, clock) : null;
-        return <li key={stop.stopId} className={status ? `status-${status}` : undefined}>
+        return <li key={stop.stopId} className={status ? `status-${status}` : undefined} data-stop-id={stop.stopId} title={`在地圖查看 ${stop.name}`}>
           <span className="nearby-stop-name">{stop.name}</span>
           <span className="nearby-stop-distance">{formatDistance(stop.distanceMeters)}</span>
           <time>{stopTime(stop)}</time>

@@ -37,6 +37,12 @@ describe("NearbyRouteCard", () => {
     expect(renderToStaticMarkup(<NearbyRouteCard item={item} />)).not.toContain("已過表定時間");
   });
 
+  it("每個站點列都帶 data-stop-id，讓卡片點擊能定位到該站", () => {
+    const html = renderToStaticMarkup(<NearbyRouteCard item={item} />);
+    for (const id of ["s1", "s2", "s3"]) expect(html).toContain(`data-stop-id="${id}"`);
+    expect(html).not.toContain('class="nearby-more" data-stop-id');
+  });
+
   it("只有一站時不顯示時間區間", () => {
     const single: NearbyRoute = { ...item, nearby: { ...item.nearby, count: 1, stops: item.nearby.stops.slice(0, 1), firstTime: "19:10", lastTime: "19:10" } };
     const html = renderToStaticMarkup(<NearbyRouteCard item={single} />);

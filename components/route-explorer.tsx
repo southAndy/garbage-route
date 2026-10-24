@@ -3,7 +3,7 @@
 import TrackedLocationButton from "./tracked-location-button";
 
 import dynamic from "next/dynamic";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -17,7 +17,7 @@ import SiteHeader from "./site-header";
 import FeedbackButton from "./feedback-button";
 import { displayTime, scheduleText } from "@/lib/schedule-display";
 import { formatDistance, GEOLOCATION_OPTIONS, locateErrorState, locateMessage, queryGeolocationPermission, roundForRequest, type GeolocationPermission, type LocateState } from "@/lib/geolocation";
-import type { NearbyResult } from "@/lib/nearby-search";
+import type { NearbyResult, NearbyRoute } from "@/lib/nearby-search";
 import NearbyRouteCard from "./nearby-route-card";
 import { partitionNearbyRoutes, taipeiClock } from "@/lib/stop-timing";
 import { ACCURACY_WARNING_METERS, clearLocationSession, getLocationSession, setLocationSession, useLocationSession } from "@/lib/user-location";
@@ -269,16 +269,22 @@ export default function RouteExplorer({
     router.replace(`/?${params}`);
   };
 
-  const selectRoute = async (summary: RouteSummary) => {
+  /**
+   * Open a route. `focus` names the stop to land on: nearby cards pass the stop
+   * the user tapped (or the closest one) so the map jumps there instead of the
+   * route's first stop. Falls back to stop 1 when the id is no longer in the route.
+   */
+  const selectRoute = async (summary: RouteSummary, focus?: { stopId: string; showDetails?: boolean }) => {
     setError("");
     try {
       const response = await fetch(`/api/v1/routes/${summary.id}`);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error?.message);
       const detail = result.data as GarbageRoute;
+      const focused = focus ? detail.stops.find((stop) => stop.id === focus.stopId) : undefined;
       setRoute(detail);
-      setSelectedStop(detail.stops[0] ?? null);
-      setMobileStopOpen(false);
+      setSelectedStop(focused ?? detail.stops[0] ?? null);
+      setMobileStopOpen(Boolean(focused && focus?.showDetails));
       setMobilePanelOpen(false);
       const search = new URLSearchParams();
       if (query) search.set("q", query);
@@ -287,6 +293,16 @@ export default function RouteExplorer({
     } catch {
       setError("找不到指定垃圾車路線，資料可能已更新。");
     }
+  };
+
+  // A nearby card is one link; the stop rows inside it carry data-stop-id so a tap
+  // on a row lands on that stop, while a tap elsewhere lands on the closest stop.
+  const selectNearbyRoute = (event: MouseEvent<HTMLAnchorElement>, item: NearbyRoute) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    const row = (event.target as HTMLElement).closest<HTMLElement>("[data-stop-id]");
+    const stopId = row?.dataset.stopId ?? item.nearby.stops[0]?.stopId;
+    selectRoute(item, stopId ? { stopId, showDetails: Boolean(row) } : undefined);
   };
 
   const selectedIndex = route && selectedStop ? route.stops.findIndex((stop) => stop.id === selectedStop.id) : -1;
@@ -363,12 +379,12 @@ export default function RouteExplorer({
               {nearby.routes.length === 0 || !nearbyGroups ? <div className="empty-state"><span>1 公里內沒有垃圾車站點</span><p>請改用行政區與路名搜尋</p>{nearby.resolved && <FeedbackButton label="附近應該有站點？告訴我們" context={{ entry: "empty_nearby", city: nearby.resolved.city, district: nearby.resolved.district, radius: String(nearby.radius) }} summary={`${CITY_NAMES[nearby.resolved.city]}・${nearby.resolved.district}・附近 ${nearby.radius} 公尺無結果`} />}</div> : (
                 <div className="route-list">
                   {nearbyGroups.upcoming.length === 0 && <p className="nearby-all-passed">附近路線今天的表定時間都已過，或今日不收。以下列表可供規劃其他日子。</p>}
-                  {nearbyGroups.upcoming.map(({ route: item, timing }) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card nearby-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); selectRoute(item); }}>
+                  {nearbyGroups.upcoming.map(({ route: item, timing }) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card nearby-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => selectNearbyRoute(event, item)}>
                     <NearbyRouteCard item={item} clock={nearbyGroups.clock} timing={timing} />
                   </Link>)}
                   {nearbyGroups.later.length > 0 && <details className="nearby-later" open={nearbyGroups.upcoming.length === 0}>
                     <summary>今天已過或不收的 {nearbyGroups.later.length} 條路線</summary>
-                    {nearbyGroups.later.map(({ route: item, timing }) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card nearby-card is-later ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); selectRoute(item); }}>
+                    {nearbyGroups.later.map(({ route: item, timing }) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card nearby-card is-later ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => selectNearbyRoute(event, item)}>
                       <NearbyRouteCard item={item} clock={nearbyGroups.clock} timing={timing} />
                     </Link>)}
                   </details>}
