@@ -9,6 +9,9 @@
 - 來源：https://data.taipei/dataset/detail?id=6bb3304b-4f46-4bb0-8cd1-60c66dcd1cae
 - 授權：政府資料開放授權條款－第 1 版
 
+臺北市限時收受點另使用「臺北市垃圾資源回收、廚餘回收限時收受點」，由臺北市政府環境保護局提供，依政府資料開放授權條款－第 1 版使用：
+https://data.taipei/dataset/detail?id=1acf38f3-1509-4cb1-898a-9b1d4f31a3af
+
 ## 新北市開放資料
 
 - 資料集：新北市垃圾車路線

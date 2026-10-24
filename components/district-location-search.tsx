@@ -69,6 +69,7 @@ export default function DistrictLocationSearch({ city, districtSlug }: { city: C
       }}>清除定位</button>}
     </div>
     <p className="hub-note">允許定位後，將切換至所在行政區並顯示附近路線。僅傳送約略座標查詢，不會儲存位置。</p>
+    <Link href="/collection-points" className="collection-entry">錯過垃圾車？找限時收受點 →</Link>
     <div role="status">
       {message && <p className="locate-message">{message}{nearby && " 下方仍為上次成功查詢的結果。"}</p>}
       {nearby?.resolved && <p>位置約在{CITY_NAMES[nearby.resolved.city]}{nearby.resolved.district}，{formatDistance(nearby.radius)}內有 {nearby.routes.length} 條路線。{nearby.expanded && "已擴大查詢至 1 公里。"}</p>}

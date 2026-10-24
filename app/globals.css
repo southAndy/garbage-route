@@ -1,4 +1,23 @@
 :root { --ink:#173c30; --green:#1f6b50; --cream:#f5f0e6; --paper:#fffdf8; --gold:#f5b840; --red:#d34a32; --muted:#6f7974; --line:#d9ded8; --shadow:0 18px 45px rgba(23,60,48,.14); }
+.collection-entry { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:16px; padding:13px 15px; border:1px solid #d9c99e; border-radius:10px; background:#fff5db; color:var(--ink); text-decoration:none; font-size:14px; font-weight:600; }
+.collection-entry:hover { background:#ffebba; }
+.collection-hub a { color:var(--green); }
+.collection-eyebrow { margin-top:26px; color:var(--green); font-size:13px; font-weight:700; letter-spacing:.06em; }
+.collection-hub .city-tabs { max-width:420px; }
+.collection-notice,.collection-official { padding:20px; border:1px solid var(--line); border-radius:14px; background:var(--paper); line-height:1.8; }
+.collection-notice { border-left:4px solid var(--gold); }
+.collection-filters { display:flex; align-items:end; flex-wrap:wrap; gap:12px; margin-top:24px; }
+.collection-filters label { display:grid; gap:8px; min-width:180px; font-size:14px; }
+.collection-filters button { min-height:45px; }
+.collection-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr)); gap:18px; padding:0; list-style:none; }
+.collection-card { padding:22px; background:var(--paper); border:1px solid var(--line); border-radius:14px; min-width:0; overflow-wrap:anywhere; }
+.collection-card-heading { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; color:var(--green); font-size:13px; }
+.collection-card h2 { font-size:21px; margin:14px 0; }
+.collection-card h3 { font-size:14px; margin-top:24px; }
+.collection-card p { line-height:1.8; }
+.collection-notes { white-space:pre-wrap; font-size:14px; }
+.collection-card-actions { display:flex; flex-wrap:wrap; align-items:center; gap:14px; border-top:1px solid var(--line); padding-top:16px; font-size:14px; }
+.collection-card-actions a { font-weight:700; }
 * { box-sizing:border-box; }
 html, body { margin:0; min-height:100%; background:var(--cream); color:var(--ink); font-family:var(--font-sans),"Noto Sans TC",system-ui,sans-serif; }
 button,input,select { font:inherit; }

@@ -18,6 +18,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 0.9,
     },
+    {
+      url: `${siteUrl}/collection-points`,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
     ...cities.map((city) => ({
       url: `${siteUrl}${cityPath(city.code)}`,
       changeFrequency: "weekly" as const,
