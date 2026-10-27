@@ -13,7 +13,7 @@ export default function MapAreaSearch({ city, district, initialQuery, disabled, 
   const pending = useRef<AbortController | null>(null);
   useEffect(() => () => pending.current?.abort(), [city, district]);
   const search = async () => {
-    if (disabled || busy || !district || query.trim().length < 2) return;
+    if (disabled || busy || query.trim().length < 2) return;
     pending.current?.abort();
     const controller = new AbortController(); pending.current = controller;
     setBusy(true); setMessage("");
@@ -25,7 +25,7 @@ export default function MapAreaSearch({ city, district, initialQuery, disabled, 
       if (controller.signal.aborted) return;
       if (!result.data) {
         trackMapPicker({ name: "map_area_search_result", status: "empty" });
-        setMessage("此行政區沒有符合且可定位的站點，試試路名、巷弄或其他關鍵字。"); return;
+        setMessage("沒有符合且可定位的站點，試試路名、巷弄或其他關鍵字。"); return;
       }
       const area = result.data as SearchArea;
       onArea(area);
@@ -41,9 +41,8 @@ export default function MapAreaSearch({ city, district, initialQuery, disabled, 
     }
   };
   return <form className="map-area-search" onSubmit={(event) => { event.preventDefault(); void search(); }}>
-    <label htmlFor="map-area-keyword">用關鍵字縮小範圍 · {CITY_NAMES[city]}{district}</label>
-    <div><input id="map-area-keyword" value={query} maxLength={160} disabled={disabled} placeholder="例如：景新街、景新街295巷" onChange={(event) => { pending.current?.abort(); setBusy(false); setMessage(""); setQuery(event.target.value); }} /><button type="submit" disabled={disabled || busy || !district || query.trim().length < 2}>{busy ? "查詢中…" : "縮小範圍"}</button></div>
-    {!district && <p>請先取消選點，在搜尋面板選擇行政區。</p>}
+    <label htmlFor="map-area-keyword">用關鍵字縮小範圍 · {district ? `${CITY_NAMES[city]}${district}` : "雙北"}</label>
+    <div><input id="map-area-keyword" value={query} maxLength={160} disabled={disabled} placeholder="例如：景新街、景新街295巷" onChange={(event) => { pending.current?.abort(); setBusy(false); setMessage(""); setQuery(event.target.value); }} /><button type="submit" disabled={disabled || busy || query.trim().length < 2}>{busy ? "查詢中…" : "縮小範圍"}</button></div>
     {message && <p role="status">{message}</p>}
   </form>;
 }

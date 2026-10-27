@@ -1,6 +1,8 @@
 "use client";
 
 import LocationMethodSelect from "./location-method-select";
+import LocationSearch from "./location-search";
+import type { LocationSuggestion } from "@/lib/location-suggestions";
 import { trackMapPicker } from "@/lib/map-picker-analytics";
 
 import dynamic from "next/dynamic";
@@ -47,7 +49,6 @@ function getServerMobileSnapshot() { return false; }
 const noopSubscribe = () => () => {};
 function useHydrated() { return useSyncExternalStore(noopSubscribe, () => true, () => false); }
 
-type District = { name: string; slug: string; routeCount: number };
 
 // Taipei time assembled by hand (no Intl) so build-time HTML and the browser produce byte-identical text.
 const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
@@ -89,9 +90,6 @@ export default function RouteExplorer({
   const panelRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [city, setCity] = useState<CityCode>(initialRoute?.cityCode ?? initialCity);
-  const [districts, setDistricts] = useState<District[]>([]);
-  const [loadingDistricts, setLoadingDistricts] = useState(true);
-  const [districtsFailed, setDistrictsFailed] = useState(false);
   const [district, setDistrict] = useState(initialRoute?.district ?? initialDistrict);
   const [routes, setRoutes] = useState<RouteSummary[]>([]);
   const [route, setRoute] = useState<GarbageRoute | null>(initialRoute);
@@ -104,7 +102,8 @@ export default function RouteExplorer({
   });
   const [query, setQuery] = useState(initialQuery);
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
-  const [loadingRoutes, setLoadingRoutes] = useState(true);
+  const [loadingRoutes, setLoadingRoutes] = useState(Boolean(initialRoute || initialDistrict));
+  const [awaitingLocation, setAwaitingLocation] = useState(!initialRoute && !initialDistrict);
   const [error, setError] = useState(invalidSharedPath ? "分享的路線已失效，請重新選擇路線。" : "");
   // The collapsed popup is small enough to show from the start; closing it is one tap away.
   const [mobileStopOpen, setMobileStopOpen] = useState(() => Boolean(initialRoute && selectedStop));
@@ -127,9 +126,6 @@ export default function RouteExplorer({
   const [mapFailed, setMapFailed] = useState(false);
   // Keep the mobile map visible on entry; users open the search sheet explicitly.
   const [mobilePanelOpen, setMobilePanelOpen] = useState(() => !initialRoute && Boolean(getLocationSession()?.position.referenceLabel));
-  // On mobile the area pickers (city, district) fold away behind a chip once an area is chosen,
-  // so the sticky head stays short enough to leave room for results.
-  const [areaOpen, setAreaOpen] = useState(false);
   // The pre-permission card shown before the browser's own location prompt (see requestLocate).
   const [locateExplainerOpen, setLocateExplainerOpen] = useState(false);
   const explainerRef = useRef<HTMLDivElement>(null);
@@ -273,27 +269,7 @@ export default function RouteExplorer({
   }, [query]);
 
   useEffect(() => {
-    let active = true;
-    fetch(`/api/v1/districts?city=${city}`).then((res) => {
-      if (!res.ok) throw new Error("District request failed");
-      return res.json();
-    }).then((result) => {
-      if (!active) return;
-      const next = result.data ?? [];
-      setDistricts(next);
-      setDistrict((current) => next.some((item: District) => item.name === current) ? current : next[0]?.name ?? "");
-      if (next.length === 0) setLoadingRoutes(false);
-    }).catch(() => {
-      if (!active) return;
-      setDistrictsFailed(true);
-      setError("行政區載入失敗，請稍後再試。");
-      setLoadingRoutes(false);
-    }).finally(() => active && setLoadingDistricts(false));
-    return () => { active = false; };
-  }, [city]);
-
-  useEffect(() => {
-    if (!district) return;
+    if (!district || awaitingLocation) return;
     let active = true;
     // The loading flag intentionally mirrors this request lifecycle.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -307,7 +283,7 @@ export default function RouteExplorer({
     }).catch(() => active && setError("路線載入失敗，請稍後再試。"))
       .finally(() => active && setLoadingRoutes(false));
     return () => { active = false; };
-  }, [city, district, debouncedQuery]);
+  }, [city, district, debouncedQuery, awaitingLocation]);
 
   const clearNearby = useCallback(() => {
     clearLocationSession();
@@ -315,10 +291,8 @@ export default function RouteExplorer({
   }, []);
 
   const applyResolvedArea = (nextCity: CityCode, nextDistrict: string) => {
-    if (nextCity !== city) {
-      setLoadingDistricts(true); setDistrictsFailed(false);
-      setDistricts([]); setCity(nextCity);
-    }
+    setCity(nextCity);
+    setAwaitingLocation(false);
     setDistrict(nextDistrict);
     setRoute(null); setSelectedStop(null); setError("");
     // Only the inferred area goes into the URL; coordinates never do.
@@ -429,22 +403,13 @@ export default function RouteExplorer({
     searchInputRef.current?.scrollIntoView({ block: "nearest", behavior: "auto" });
   };
 
-  const selectCity = (nextCity: CityCode) => {
-    if (nextCity === city) return;
+  const selectLocation = (item: LocationSuggestion) => {
+    if (!awaitingLocation && item.city === city && item.district === district && item.query === debouncedQuery) { clearNearby(); return; }
     clearNearby();
-    setLoadingDistricts(true); setDistrictsFailed(false);
-    setLoadingRoutes(true); setRoutes([]); setDistricts([]);
-    setCity(nextCity); setDistrict(""); setRoute(null); setSelectedStop(null); setQuery(""); setError("");
-    router.replace(`/?city=${nextCity}`);
-  };
-
-  const selectDistrict = (nextDistrict: string) => {
-    clearNearby();
-    setAreaOpen(false);
-    setDistrict(nextDistrict); setRoute(null); setSelectedStop(null); setError("");
-    const params = new URLSearchParams({ city, district: nextDistrict });
-    if (query) params.set("q", query);
-    router.replace(`/?${params}`);
+    setCity(item.city); setDistrict(item.district);
+    setQuery(item.query); setDebouncedQuery(item.query); setAwaitingLocation(false);
+    setRoutes([]); setLoadingRoutes(true); setRoute(null); setSelectedStop(null); setError("");
+    router.replace(`/?${new URLSearchParams({ city: item.city, district: item.district, q: item.query })}`);
   };
 
   /**
@@ -547,33 +512,19 @@ export default function RouteExplorer({
         <aside ref={sidebarRef} className={`sidebar ${mobilePanelOpen ? "is-open" : ""}`} aria-label="路線查詢">
           <button className="sheet-handle" aria-expanded={mobilePanelOpen} aria-controls="route-search-panel" onClick={() => setMobilePanelOpen((open) => !open)}>
             <span className="sheet-grip" aria-hidden="true" />
-            <span className="sheet-label"><strong>{district || CITY_NAMES[city]}</strong><span>{mobilePanelOpen ? "收合路線搜尋" : route ? "搜尋其他路線" : "搜尋垃圾車路線"}</span><span aria-hidden="true">{mobilePanelOpen ? "⌄" : "⌃"}</span></span>
+            <span className="sheet-label"><strong>{district || "雙北"}</strong><span>{mobilePanelOpen ? "收合路線搜尋" : route ? "搜尋其他路線" : "搜尋垃圾車路線"}</span><span aria-hidden="true">{mobilePanelOpen ? "⌄" : "⌃"}</span></span>
           </button>
           <div ref={panelRef} id="route-search-panel" className="search-panel-content" hidden={isMobile && !mobilePanelOpen} onScroll={rememberScroll}>
           {(!isMobile || mobilePanelOpen) && <>
           <div className="search-head">
             <div className="search-head-top">
-              <button type="button" className="area-chip" aria-expanded={areaOpen} aria-controls="area-filters" onClick={() => setAreaOpen((open) => !open)}>{CITY_NAMES[city]}・{district || "選擇行政區"}<span aria-hidden="true">⌄</span></button>
+              <span className="area-chip">{district && !awaitingLocation ? `${CITY_NAMES[city]}・${district}` : "搜尋雙北地點"}</span>
               <button type="button" className="search-close" aria-label="關閉搜尋，回到地圖" onClick={() => setMobilePanelOpen(false)}>×</button>
             </div>
-            <div id="area-filters" className={`area-filters ${areaOpen || !district ? "is-open" : ""}`}>
-              <div className="city-tabs" aria-label="城市">
-                {(Object.keys(CITY_NAMES) as CityCode[]).map((code) => <button key={code} className={city === code ? "active" : ""} aria-pressed={city === code} onClick={() => selectCity(code)}>{CITY_NAMES[code]}</button>)}
-              </div>
-              <label className="field-label" htmlFor="district">行政區</label>
-              <div className={`select-wrap ${loadingDistricts ? "is-loading" : ""}`}>
-                <select id="district" value={loadingDistricts || districts.length === 0 ? "" : district} disabled={loadingDistricts || districts.length === 0} aria-busy={loadingDistricts} onChange={(event) => selectDistrict(event.target.value)}>
-                  {loadingDistricts ? <option value="">正在載入行政區…</option> : districts.length === 0 ? <option value="">{districtsFailed ? "行政區載入失敗" : "暫無可選行政區"}</option> : districts.map((item) => <option value={item.name} key={item.name}>{item.name}（{item.routeCount} 條）</option>)}
-                </select>
-              </div>
-            </div>
             <div className="search-row">
-              <label className="sr-only" htmlFor="route-search">搜尋{district || CITY_NAMES[city]}的路名或停靠點</label>
-              <div className="search-wrap">
-                <span aria-hidden="true">⌕</span>
-                <input ref={searchInputRef} id="route-search" value={query} onChange={(event) => { if (nearby) clearNearby(); setQuery(event.target.value); }} placeholder={district === "士林區" ? "例如：延平北路、社子" : "輸入路名或地點，例如 永平路"} />
-                {query && <button type="button" className="search-clear" aria-label="清除搜尋" onClick={() => { setQuery(""); focusSearchInput(); }}>×</button>}
-              </div>
+              <LocationSearch query={query} inputRef={searchInputRef} onSelect={selectLocation} onQuery={(value) => {
+                clearNearby(); setQuery(value); setAwaitingLocation(true); setRoutes([]); setLoadingRoutes(false); setError("");
+              }} />
             </div>
             {locateMessage(locateState, userAgent) && <div id="locate-message" className={`locate-message ${locateState === "denied" ? "is-blocked" : ""}`} role="status">
               <p>{locateMessage(locateState, userAgent)}</p>
@@ -589,7 +540,7 @@ export default function RouteExplorer({
               {nearby ? <>
                 <span>{referenceLabel ? "參考位置附近" : "你附近"} {nearby.radius >= 1000 ? "1 公里" : `${nearby.radius} 公尺`}內有 <b>{nearby.routes.length}</b> 條路線</span>
                 <button type="button" className="clear-nearby" onClick={clearNearby}>{referenceLabel ? "清除參考位置" : "清除定位"}</button>
-              </> : loadingRoutes ? <span>查詢中…</span> : searchGroups ? <>
+              </> : awaitingLocation || !district ? <span>輸入關鍵字，再選擇符合的地點</span> : loadingRoutes ? <span>查詢中…</span> : searchGroups ? <>
                 <span><b>{routes.length}</b> 條路線經過「{matchedQuery}」{searchGroups.upcoming.length > 1 && "・依最快抵達"}</span>
                 <Link href="/collection-points">限時收受點 →</Link>
               </> : <>
@@ -620,7 +571,7 @@ export default function RouteExplorer({
                 <small>{nearbySort === "time" ? "現在就要丟：先看最快到的車" : "願意等：先看距參考位置最近的站"}</small>
               </div>}
               {userPosition?.accuracy != null && userPosition.accuracy > ACCURACY_WARNING_METERS && <p className="nearby-accuracy-warning" role="status">定位誤差約 {formatDistance(userPosition.accuracy)}，附近結果僅供參考，建議改用路名搜尋確認。</p>}
-              {nearby.routes.length === 0 || !nearbyGroups ? <div className="empty-state"><span>1 公里內沒有垃圾車站點</span><p>請改用行政區與路名搜尋</p>{nearby.resolved && <FeedbackButton label="附近應該有站點？告訴我們" context={{ entry: "empty_nearby", city: nearby.resolved.city, district: nearby.resolved.district, radius: String(nearby.radius) }} summary={`${CITY_NAMES[nearby.resolved.city]}・${nearby.resolved.district}・附近 ${nearby.radius} 公尺無結果`} />}</div> : (
+              {nearby.routes.length === 0 || !nearbyGroups ? <div className="empty-state"><span>1 公里內沒有垃圾車站點</span><p>請改用路名或地址搜尋</p>{nearby.resolved && <FeedbackButton label="附近應該有站點？告訴我們" context={{ entry: "empty_nearby", city: nearby.resolved.city, district: nearby.resolved.district, radius: String(nearby.radius) }} summary={`${CITY_NAMES[nearby.resolved.city]}・${nearby.resolved.district}・附近 ${nearby.radius} 公尺無結果`} />}</div> : (
                 <div ref={listRef} className="route-list" onScroll={rememberScroll}>
                   {nearbyGroups.upcoming.length === 0 && <p className="nearby-all-passed">附近路線今天的表定時間都已過，或今日不收。<Link href="/collection-points">找限時收受點 →</Link> 以下列表可供規劃其他日子。</p>}
                   {nearbyGroups.upcoming.map(({ route: item, timing }) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card nearby-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => selectNearbyRoute(event, item)}>
@@ -637,7 +588,7 @@ export default function RouteExplorer({
               )}
             </> : <>
             {error && <div className="alert" role="alert">{error}</div>}
-            {loadingRoutes ? <div className="routes-loading" role="status"><span className="spinner" aria-hidden="true" /><span>正在載入路線資料…</span></div> : routes.length === 0 ? !error && <div className="empty-state"><span>沒有相符路線</span><p>試試其他關鍵字或行政區</p>{district && <FeedbackButton label="找不到要找的地點？告訴我們" context={{ entry: "empty_search", city, district, query: debouncedQuery }} summary={`${CITY_NAMES[city]}・${district}${debouncedQuery ? `・搜尋：${debouncedQuery}` : ""}`} />}</div> : searchGroups ? (
+            {awaitingLocation || !district ? <div className="empty-state"><span>想找哪裡的垃圾車？</span><p>輸入路名、地址或站點，從下拉選單選擇地點。</p></div> : loadingRoutes ? <div className="routes-loading" role="status"><span className="spinner" aria-hidden="true" /><span>正在載入路線資料…</span></div> : routes.length === 0 ? !error && <div className="empty-state"><span>沒有相符路線</span><p>試試其他路名或地址</p>{district && <FeedbackButton label="找不到要找的地點？告訴我們" context={{ entry: "empty_search", city, district, query: debouncedQuery }} summary={`${CITY_NAMES[city]}・${district}${debouncedQuery ? `・搜尋：${debouncedQuery}` : ""}`} />}</div> : searchGroups ? (
               <div ref={listRef} className="route-list" onScroll={rememberScroll}>
                 {searchGroups.upcoming.length === 0 && <p className="nearby-all-passed">經過「{matchedQuery}」的路線今天表定時間都已過，或今日不收。<Link href="/collection-points">找限時收受點 →</Link> 以下列表可供規劃其他日子。</p>}
                 {searchGroups.upcoming.map(({ route: item, timing }, index) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card search-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => selectCardRoute(event, item, item.matches?.stops[Math.max(timing.nextIndex, 0)]?.stopId)}>
@@ -679,7 +630,7 @@ export default function RouteExplorer({
 
         <section className={`map-stage${picking ? " is-picking" : ""}`} ref={mapStageRef} tabIndex={-1} aria-label="路線地圖與所選停靠點">
           {mapFailed ? <div className="map-fallback"><strong>地圖目前無法載入</strong><p>仍可從路線面板查看完整停靠點。</p><button onClick={() => { setMapFailed(false); window.location.reload(); }}>重新載入</button></div> : <RouteMap searchCity={city} searchDistrict={district} searchQuery={query} route={route} selectedStop={selectedStop} userPosition={userPosition} picking={picking} referenceBusy={referenceBusy} referenceError={referenceError} onConfirmReference={confirmReference} onCancelReference={cancelReference} popupLayout={`${mobileStopOpen}-${popupExpanded}`} onSelectStop={chooseStop} onMapError={handleMapError} />}
-          {!route && !invalidSharedPath && !userPosition && !picking && <div className="map-intro"><p className="eyebrow">TAIPEI · NEW TAIPEI</p><h1>台北、新北<br />垃圾車時間與路線查詢</h1><p>今晚的垃圾車會停在哪裡？<br />選擇城市、行政區與路線，查看每一站的表定時間。</p><div className="intro-steps"><span><b>1</b>選城市</span><i>→</i><span><b>2</b>選行政區</span><i>→</i><span><b>3</b>看路線</span></div><button type="button" className="intro-search-button" onClick={openRouteSearch} aria-controls="route-search-panel">搜尋路名或地點 →</button></div>}
+          {!route && !invalidSharedPath && !userPosition && !picking && <div className="map-intro"><p className="eyebrow">TAIPEI · NEW TAIPEI</p><h1>台北、新北<br />垃圾車時間與路線查詢</h1><p>今晚的垃圾車會停在哪裡？<br />輸入路名或地址，選擇地點後查看停靠站與表定時間。</p><div className="intro-steps"><span><b>1</b>輸入關鍵字</span><i>→</i><span><b>2</b>選地點</span><i>→</i><span><b>3</b>看路線</span></div><button type="button" className="intro-search-button" onClick={openRouteSearch} aria-controls="route-search-panel">搜尋路名或地點 →</button></div>}
           {route && validCount === 0 && <div className="map-warning">此路線暫無可用地圖位置，請查看文字停靠點列表。</div>}
           {route && warningCount > 0 && <div className="map-warning coordinate-review-warning" role="status">此路線有 {warningCount} 項位置待確認，橘色虛線為可疑區段。</div>}
           {route && <div className={`route-strip ${stripOpen ? "is-open" : ""}`}>

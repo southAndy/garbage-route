@@ -57,6 +57,17 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible { 
 .city-tabs button.active { color:var(--ink); background:var(--paper); box-shadow:0 2px 9px rgba(23,60,48,.1); }
 .field-label { display:block; margin:13px 0 7px; color:#53625c; font-size:12px; font-weight:600; }
 .select-wrap,.search-wrap { position:relative; }
+.district-combobox { position:relative; }
+.district-combobox input { padding-right:42px; font-size:16px; }
+.district-combobox input:disabled { color:var(--muted); background:#f0f4f1; }
+.district-toggle { position:absolute; right:2px; top:2px; width:40px; height:41px; border:0; background:transparent; color:var(--green); cursor:pointer; }
+.district-dropdown { position:absolute; top:calc(100% + 5px); left:0; right:0; z-index:25; border:1px solid #ccd4ce; border-radius:10px; background:#fff; box-shadow:0 5px 18px #173c3024; overflow:hidden; }
+.district-dropdown ul { list-style:none; margin:0; padding:4px; max-height:220px; overflow:auto; overscroll-behavior:contain; }
+.district-dropdown li { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:42px; padding:8px 10px; border-radius:6px; cursor:pointer; }
+.district-dropdown li.is-active,.district-dropdown li:hover { background:#edf5ef; }
+.district-dropdown li[aria-selected="true"] { font-weight:700; color:var(--green); }
+.district-dropdown small { color:var(--muted); font-size:12px; white-space:nowrap; font-weight:400; }
+.district-dropdown p { margin:0; padding:14px; font-size:13px; line-height:1.5; color:var(--muted); }
 .select-wrap:after { content:"⌄"; position:absolute; right:14px; top:10px; pointer-events:none; color:var(--green); }
 .select-wrap.is-loading:after { content:""; top:calc(50% - 8px); width:16px; height:16px; border:2px solid #cad5cf; border-top-color:var(--green); border-radius:50%; animation:spin .8s linear infinite; }
 .select-wrap select:disabled { opacity:1; color:var(--muted); -webkit-text-fill-color:var(--muted); background:#f0f4f1; cursor:default; }
@@ -554,3 +565,5 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 .hub .ad-slot { padding:32px 0 0; }
 @media (max-width:760px) { .ad-slot { padding:16px 18px 24px; }.ad-slot-frame { max-width:320px; height:100px; }.hub .ad-slot { padding:28px 0 0; } }
 .ad-slot-sentinel { height:0; margin:0; padding:0; overflow:hidden; }
+
+.location-search { width: 100%; }

@@ -6,11 +6,14 @@ import { createNearbyIndex, searchNearby, type GeoPoint, type NearbyIndex, type 
 import { toSummary } from "./route-summary";
 import { searchRoutes } from "./route-search";
 import { matchedStopArea } from "./search-area";
+import { createLocationIndex, suggestLocations } from "./location-suggestions";
 import type { CityCode, GarbageRoute, RouteCoordinateWarning, RouteSummary } from "./types";
 
 export { CITY_NAMES, cityPath, districtPath, parseCityCode, routePath } from "./paths";
 
 const routes = routesData as GarbageRoute[];
+const locationIndex = createLocationIndex(routes);
+export function findLocationSuggestions(query: string) { return suggestLocations(locationIndex, query); }
 const manifest = manifestData as { lastCheckedAt?: string };
 const suspiciousCoordinates = suspiciousCoordinatesData as SuspiciousCoordinateReport;
 const warningsByRoute = new Map<string, RouteCoordinateWarning[]>();
@@ -63,7 +66,7 @@ export function findRoutes(city: CityCode, district: string, query = ""): RouteS
 let nearbyIndex: NearbyIndex | null = null;
 
 export function findSearchArea(city: CityCode, district: string, query: string) {
-  const scoped = routes.filter((route) => route.cityCode === city && route.district === district);
+  const scoped = district ? routes.filter((route) => route.cityCode === city && route.district === district) : routes;
   const excluded = new Set([...warningsByRoute.values()].flat().flatMap((warning) => warning.affectedStopIds));
   return matchedStopArea(scoped, searchRoutes(scoped, query), query, excluded);
 }
