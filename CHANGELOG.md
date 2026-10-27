@@ -4,6 +4,7 @@
 
 - 問卷的一鍵答案（`survey_answered`、`survey_reasons`）另存到 Tally 綁的 Google Sheet：新增 `POST /api/survey` 轉送到 Apps Script 網頁應用程式（`scripts/survey-sheet-webhook.gs`），寫進 `quick_answers` 分頁；由 `SURVEY_SHEET_WEBHOOK_URL`、`SURVEY_SHEET_SECRET` 啟用，未設定時不另存。
 - 新增 `vitest.config.ts` 讓測試也能解析 `@/` 路徑別名，API route 可直接測。
+- 新增 Vercel 事件 `collection_entry_viewed`／`collection_entry_clicked`（`source=route_list`），記錄首頁／路線頁預設清單列「錯過垃圾車？限時收受點」入口的曝光與點擊，可算點擊率。
 
 ## 0.6.0
 

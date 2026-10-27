@@ -26,6 +26,8 @@ npm run dev
 
 `nearby_sort_time`（切到最快抵達）與 `nearby_sort_distance`（切到最近距離）在附近路線的排序實際改變時送出，附帶 `from`（原排序）；重按已選中的選項不計。切換值會存在瀏覽器 `localStorage`，所以事件代表「改變偏好」而非每次進站的設定。`nearby_sort_distance` 的比例可視為「願意等離家最近那台車」的使用者佔比。
 
+首頁／路線頁預設路線清單列的「錯過垃圾車？限時收受點」入口（`components/collection-entry-link.tsx`）送 `collection_entry_viewed`（連結至少 50% 進入可視區域時送出、每次掛載最多一次，點擊早於曝光回呼時會先補記曝光）與 `collection_entry_clicked`（每次點擊），都附帶 `source=route_list`。以點擊事件的不重複訪客數除以曝光事件的不重複訪客數得到點擊率。行政區頁、依地區瀏覽頁與搜尋結果列的其他入口連結不送事件；`/collection-points` 的頁面瀏覽數會另外包含搜尋引擎與直接進站的流量，不等於入口點擊數。
+
 路線頁的查詢體驗問卷（`components/survey-prompt.tsx`）在點過站點或換過站之後再停留 20 秒才以底部抽屜跳出，搜尋面板或站點詳情開著時延後；同一次瀏覽只問一次，回答或關掉後記在 `localStorage`，14 天內不再出現。事件：`survey_shown`（`trigger`：`stop_dwell`／`stop_nav`、`visit`：`first`／`return`）、`survey_answered`（`outcome`：`found`／`not_found`）、`survey_reasons`（`reasons` 以逗號相接，略過為 `skipped`）、`survey_form_opened`、`survey_form_declined`、`survey_dismissed`（`step`：`question`／`reasons`／`invite`），都附帶 `route_id`、`city`、`district`，不含位置或自由文字。`survey_shown → survey_answered` 看問法與時機，`survey_answered → survey_form_opened` 看 Tally 表單值不值得留；`outcome=not_found` 的比例與 `reasons` 分布本身就是產品回饋，不必等表單。
 
 `survey_answered` 與 `survey_reasons` 兩種答案除了送 Vercel 事件，也會 POST 到 `app/api/survey/route.ts`，由它轉送到綁在 Tally 那份試算表上的 Apps Script（`scripts/survey-sheet-webhook.gs`，寫進 `quick_answers` 分頁，不碰 Tally 自己的分頁），這樣答案不受 Vercel Analytics 保留期限影響，也能和 Tally 的長答案放在同一個檔案裡交叉看。欄位與事件 property 完全相同（`event`、`outcome`、`reasons`、`route_id`、`city`、`district`、`visit`），沒有位置、自由文字或任何識別。需要 `SURVEY_SHEET_WEBHOOK_URL` 與 `SURVEY_SHEET_SECRET` 兩個環境變數，缺任何一個時 API 直接回 204、不另存；前端是 fire-and-forget，另存失敗不影響問卷與事件。Apps Script 的部署步驟寫在該檔案開頭。

@@ -20,6 +20,7 @@ import { formatDistance, GEOLOCATION_OPTIONS, locateErrorState, locateMessage, q
 import type { NearbyResult, NearbyRoute } from "@/lib/nearby-search";
 import NearbyRouteCard from "./nearby-route-card";
 import SearchRouteCard from "./search-route-card";
+import CollectionEntryLink from "./collection-entry-link";
 import { closestUpcomingRouteId, partitionNearbyRoutes, partitionSearchResults, routeSpanLabel, routeSpanStatus, taipeiClock, type NearbySort } from "@/lib/stop-timing";
 import { dismissNearbyHint, hasSeenLocateExplainer, isNearbyHintDismissed, markLocateExplainerSeen } from "@/lib/search-hints";
 import { nextUpcomingStop, routeTodayStatus, scheduleRows, stopPillLabel, stopStatus, WEEKDAY_NAMES } from "@/lib/route-status";
@@ -541,7 +542,7 @@ export default function RouteExplorer({
                 <Link href="/collection-points">限時收受點 →</Link>
               </> : <>
                 <span>{district || CITY_NAMES[city]} {routes.length} 條路線・依名稱排序</span>
-                <Link href="/collection-points">錯過垃圾車？限時收受點 →</Link>
+                <CollectionEntryLink source="route_list">錯過垃圾車？限時收受點 →</CollectionEntryLink>
               </>}
             </div>
           </div>
