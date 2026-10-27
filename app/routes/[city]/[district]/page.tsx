@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import AdSlot from "@/components/ad-slot";
 import Breadcrumb from "@/components/breadcrumb";
 import SiteHeader from "@/components/site-header";
 import DistrictLocationSearch from "@/components/district-location-search";
@@ -52,6 +53,7 @@ export default async function DistrictPage({ params }: DistrictPageProps) {
             </li>
           ))}
         </ul>
+        <AdSlot slot="district_list" />
         <p className="hub-note">本資料為政府公布的表定資訊，並非垃圾車即時位置。</p>
       </div>
     </main>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import AdSlot from "@/components/ad-slot";
 import Breadcrumb from "@/components/breadcrumb";
 import RouteExplorer from "@/components/route-explorer";
 import { socialMetadata } from "@/lib/social-metadata";
@@ -56,6 +57,7 @@ export default async function SharedRoutePage({ params }: RoutePageProps) {
       syncQueryFromUrl
       breadcrumb={<Breadcrumb items={[{ label: "首頁", href: "/" }, { label: cityName, href: cityPath(route.cityCode) }, { label: route.district, href: districtPath(route.cityCode, route.districtSlug) }, { label: routeLabel }]} />}
     >
+      <AdSlot slot="route_stops" />
       {siblings.length > 0 && <section className="related-routes" aria-labelledby="related-routes-title">
         <p className="eyebrow">MORE IN {route.district}</p>
         <h2 id="related-routes-title">{cityName}{route.district}其他垃圾車路線</h2>

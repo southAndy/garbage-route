@@ -517,3 +517,13 @@ select { appearance:none; padding-right:36px; cursor:pointer; }
 .stop-outcome-feedback > p { margin:0 0 12px; color:var(--muted); font-size:12px; line-height:1.6; }
 .stop-outcome-options { display:flex; flex-wrap:wrap; gap:10px; }
 .stop-outcome-options > .feedback-button { flex:1; min-width:100px; background:var(--paper); }
+
+/* Ad slot: a fixed-size frame (320×100 mobile, 728×90 desktop) so the page never shifts when an ad fills it. */
+.ad-slot { display:flex; flex-direction:column; align-items:center; gap:6px; padding:20px max(5vw,35px) 28px; background:var(--paper); }
+.ad-slot-tag { font-size:11px; letter-spacing:.12em; color:var(--muted); }
+.ad-slot-frame { width:100%; max-width:728px; height:90px; }
+.ad-slot-placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; border:1px dashed #b9c2bb; border-radius:8px; background:repeating-linear-gradient(135deg,#f1f3ef 0 10px,#e9ece7 10px 20px); color:var(--muted); text-align:center; }
+.ad-slot-placeholder strong { font-size:14px; color:var(--ink); }.ad-slot-placeholder span { font-size:12px; }.ad-slot-placeholder small { font-size:11px; }
+.hub .ad-slot { padding:32px 0 0; }
+@media (max-width:760px) { .ad-slot { padding:16px 18px 24px; }.ad-slot-frame { max-width:320px; height:100px; }.hub .ad-slot { padding:28px 0 0; } }
+.ad-slot-sentinel { height:0; margin:0; padding:0; overflow:hidden; }

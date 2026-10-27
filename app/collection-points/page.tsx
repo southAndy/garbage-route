@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
+import AdSlot from "@/components/ad-slot";
 import SiteHeader from "@/components/site-header";
 import Breadcrumb from "@/components/breadcrumb";
 import CollectionPointFinder from "@/components/collection-point-finder";
@@ -25,6 +26,7 @@ export default async function CollectionPointsPage() {
       <h1>找限時收受點</h1>
       <p className="hub-lead">先確認收受時段與種類，再帶垃圾出門。限時收受點不是全天開放的垃圾場，部分地點是垃圾車限時駐點。</p>
       <CollectionPointFinder points={points} failed={failed} />
+      <AdSlot slot="collection_points" />
     </div>
   </main>;
 }
