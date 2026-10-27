@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { track } from "@vercel/analytics";
+import type { SurveyRecord } from "./survey-store";
 
 /**
  * The route-page survey: a two-step sheet (one tap "did you find it?", optional reasons, then an
@@ -8,7 +9,8 @@ import { track } from "@vercel/analytics";
  * Timing: a stop interaction starts a 20 s dwell timer; while the search panel or the popup
  * details are open the sheet waits (`setSurveyBlocked`). Frequency: once per browser session,
  * and after an answer or a dismissal not again for 14 days. Every step sends a Vercel event
- * so the funnel can be read without the form.
+ * so the funnel can be read without the form; the answers themselves are also posted to
+ * /api/survey, which keeps a durable copy in a Google Sheet when configured.
  */
 export type SurveyTrigger = "stop_dwell" | "stop_nav";
 export type SurveyStep = "question" | "reasons" | "invite";
@@ -48,6 +50,12 @@ function send(event: string, properties: Record<string, string>) {
   try { track(event, properties); } catch { /* Analytics never blocks the survey. */ }
 }
 function contextProps() { return state.context ? { ...state.context } : {}; }
+/** Fire-and-forget; `keepalive` lets the request finish even if the tab closes right after. */
+function store(record: SurveyRecord) {
+  try {
+    void fetch("/api/survey", { method: "POST", keepalive: true, headers: { "content-type": "application/json" }, body: JSON.stringify(record) }).catch(() => { /* Storage is optional. */ });
+  } catch { /* No fetch (old browser): the analytics event still went out. */ }
+}
 
 /** Called once per page load; whether this browser has been here before decides `visit`. */
 export function markVisited(): SurveyVisit {
@@ -84,10 +92,13 @@ export function setSurveyBlocked(next: boolean) {
 export function answerSurvey(outcome: SurveyOutcome) {
   markDone();
   send("survey_answered", { outcome, ...contextProps(), visit: state.visit });
+  if (state.context) store({ event: "survey_answered", outcome, visit: state.visit, ...state.context });
 }
 
 export function submitSurveyReasons(reasons: string[]) {
-  send("survey_reasons", { reasons: reasons.length ? reasons.join(",") : "skipped", ...contextProps() });
+  const joined = reasons.length ? reasons.join(",") : "skipped";
+  send("survey_reasons", { reasons: joined, ...contextProps() });
+  if (state.context) store({ event: "survey_reasons", reasons: joined, ...state.context });
 }
 
 export function openSurveyForm(outcome: SurveyOutcome) {

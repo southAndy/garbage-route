@@ -28,6 +28,8 @@ npm run dev
 
 路線頁的查詢體驗問卷（`components/survey-prompt.tsx`）在點過站點或換過站之後再停留 20 秒才以底部抽屜跳出，搜尋面板或站點詳情開著時延後；同一次瀏覽只問一次，回答或關掉後記在 `localStorage`，14 天內不再出現。事件：`survey_shown`（`trigger`：`stop_dwell`／`stop_nav`、`visit`：`first`／`return`）、`survey_answered`（`outcome`：`found`／`not_found`）、`survey_reasons`（`reasons` 以逗號相接，略過為 `skipped`）、`survey_form_opened`、`survey_form_declined`、`survey_dismissed`（`step`：`question`／`reasons`／`invite`），都附帶 `route_id`、`city`、`district`，不含位置或自由文字。`survey_shown → survey_answered` 看問法與時機，`survey_answered → survey_form_opened` 看 Tally 表單值不值得留；`outcome=not_found` 的比例與 `reasons` 分布本身就是產品回饋，不必等表單。
 
+`survey_answered` 與 `survey_reasons` 兩種答案除了送 Vercel 事件，也會 POST 到 `app/api/survey/route.ts`，由它轉送到綁在 Tally 那份試算表上的 Apps Script（`scripts/survey-sheet-webhook.gs`，寫進 `quick_answers` 分頁，不碰 Tally 自己的分頁），這樣答案不受 Vercel Analytics 保留期限影響，也能和 Tally 的長答案放在同一個檔案裡交叉看。欄位與事件 property 完全相同（`event`、`outcome`、`reasons`、`route_id`、`city`、`district`、`visit`），沒有位置、自由文字或任何識別。需要 `SURVEY_SHEET_WEBHOOK_URL` 與 `SURVEY_SHEET_SECRET` 兩個環境變數，缺任何一個時 API 直接回 204、不另存；前端是 fire-and-forget，另存失敗不影響問卷與事件。Apps Script 的部署步驟寫在該檔案開頭。
+
 在 Analytics → Events 選擇相同期間與 `source`，以點擊事件的不重複訪客數除以曝光事件的不重複訪客數。事件次數會包含重複操作與重新進站，不可當成訪客使用率；若後台只提供事件次數，就只能比較曝光／點擊次數，不能得到不重複訪客使用率。此實作不建立額外訪客識別碼，訪客辨識交由 Vercel 處理。曝光依 IntersectionObserver 判斷幾何可見範圍，不代表使用者確實注意到按鈕；攔截追蹤的瀏覽器不會完整計入。
 
 ## 使用者回饋（Tally＋Google Sheets）

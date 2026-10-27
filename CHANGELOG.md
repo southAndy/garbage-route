@@ -1,5 +1,10 @@
 # 更新紀錄
 
+## 未發布
+
+- 問卷的一鍵答案（`survey_answered`、`survey_reasons`）另存到 Tally 綁的 Google Sheet：新增 `POST /api/survey` 轉送到 Apps Script 網頁應用程式（`scripts/survey-sheet-webhook.gs`），寫進 `quick_answers` 分頁；由 `SURVEY_SHEET_WEBHOOK_URL`、`SURVEY_SHEET_SECRET` 啟用，未設定時不另存。
+- 新增 `vitest.config.ts` 讓測試也能解析 `@/` 路徑別名，API route 可直接測。
+
 ## 0.6.0
 
 手機路線頁把地圖讓出來：路線卡縮成狀態列、站點彈窗預設收合，問卷改為互動後才跳出的兩段式抽屜。

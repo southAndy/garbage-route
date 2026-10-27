@@ -2,7 +2,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const track = vi.fn();
+const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(() => Promise.resolve(new Response(null, { status: 202 })));
 vi.mock("@vercel/analytics", () => ({ track: (...args: unknown[]) => track(...args) }));
+vi.stubGlobal("fetch", fetchMock);
 
 import { answerSurvey, dismissSurvey, markVisited, requestSurveyPrompt, resetSurveyPromptForTests, setSurveyBlocked, submitSurveyReasons, SURVEY_DWELL_MS, useSurveyPrompt } from "./survey-prompt";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -12,7 +14,7 @@ const context = { route_id: "ntp-234001", city: "NTP", district: "永和區" };
 function Probe() { return createElement("i", null, String(useSurveyPrompt().visible)); }
 
 describe("survey prompt", () => {
-  beforeEach(() => { vi.useFakeTimers(); window.localStorage.clear(); window.sessionStorage.clear(); track.mockClear(); resetSurveyPromptForTests(); });
+  beforeEach(() => { vi.useFakeTimers(); window.localStorage.clear(); window.sessionStorage.clear(); track.mockClear(); fetchMock.mockClear(); resetSurveyPromptForTests(); });
   afterEach(() => { vi.useRealTimers(); });
 
   it("互動後停留 20 秒才顯示，並送出 survey_shown", () => {
@@ -48,6 +50,11 @@ describe("survey prompt", () => {
     submitSurveyReasons(["time_mismatch", "stop_location"]);
     expect(track).toHaveBeenCalledWith("survey_answered", { outcome: "not_found", ...context, visit: "first" });
     expect(track).toHaveBeenCalledWith("survey_reasons", { reasons: "time_mismatch,stop_location", ...context });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const posted = fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
+    expect(posted[0]).toEqual({ event: "survey_answered", outcome: "not_found", visit: "first", ...context });
+    expect(posted[1]).toEqual({ event: "survey_reasons", reasons: "time_mismatch,stop_location", ...context });
+    expect(fetchMock.mock.calls[0][1]?.keepalive).toBe(true);
     dismissSurvey("invite");
     expect(track).toHaveBeenCalledWith("survey_dismissed", { step: "invite", ...context });
     expect(Number(window.localStorage.getItem("survey-prompt-done"))).toBeGreaterThan(0);
@@ -62,6 +69,14 @@ describe("survey prompt", () => {
     requestSurveyPrompt("stop_dwell", context);
     vi.advanceTimersByTime(SURVEY_DWELL_MS);
     expect(track).toHaveBeenCalledWith("survey_shown", expect.anything());
+  });
+
+  it("另存失敗不影響問卷", () => {
+    fetchMock.mockImplementationOnce(() => Promise.reject(new Error("offline")));
+    requestSurveyPrompt("stop_dwell", context);
+    vi.advanceTimersByTime(SURVEY_DWELL_MS);
+    expect(() => answerSurvey("found")).not.toThrow();
+    expect(track).toHaveBeenCalledWith("survey_answered", expect.objectContaining({ outcome: "found" }));
   });
 
   it("伺服器端永遠不顯示", () => {
