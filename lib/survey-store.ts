@@ -1,18 +1,14 @@
 import { z } from "zod";
 
-/**
- * Durable copy of the one-tap survey answers. Vercel Analytics keeps the same fields as event
- * properties, but only for its retention window; this forwards each answer to a Google Sheet
- * through an Apps Script web app (see scripts/survey-sheet-webhook.gs) so the rows accumulate
- * next to the Tally responses. Fields mirror the analytics events exactly: no location, no free
- * text, no identifiers.
- */
+/** Durable survey storage. A per-prompt feedback_id merges answer/reason events;
+ * it is not a user identifier. Legacy clients may omit it during rollout. */
 const short = z.string().trim().min(1).max(64);
+const feedbackId = z.string().uuid().optional(); // Optional for already-open older clients.
 const reasonList = z.string().trim().min(1).max(200).regex(/^[a-z_]+(,[a-z_]+)*$/);
 
 export const surveyRecordSchema = z.discriminatedUnion("event", [
-  z.object({ event: z.literal("survey_answered"), outcome: z.enum(["found", "not_found"]), visit: z.enum(["first", "return"]), route_id: short, city: short, district: short }),
-  z.object({ event: z.literal("survey_reasons"), reasons: reasonList, route_id: short, city: short, district: short }),
+  z.object({ event: z.literal("survey_answered"), feedback_id: feedbackId, outcome: z.enum(["found", "not_found"]), visit: z.enum(["first", "return"]), route_id: short, city: short, district: short }),
+  z.object({ event: z.literal("survey_reasons"), feedback_id: feedbackId, reasons: reasonList, route_id: short, city: short, district: short }),
 ]);
 export type SurveyRecord = z.infer<typeof surveyRecordSchema>;
 

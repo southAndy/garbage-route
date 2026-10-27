@@ -52,8 +52,8 @@ describe("survey prompt", () => {
     expect(track).toHaveBeenCalledWith("survey_reasons", { reasons: "time_mismatch,stop_location", ...context });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const posted = fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
-    expect(posted[0]).toEqual({ event: "survey_answered", outcome: "not_found", visit: "first", ...context });
-    expect(posted[1]).toEqual({ event: "survey_reasons", reasons: "time_mismatch,stop_location", ...context });
+    expect(posted[0]).toEqual({ feedback_id: expect.any(String), event: "survey_answered", outcome: "not_found", visit: "first", ...context });
+    expect(posted[1]).toEqual({ feedback_id: posted[0].feedback_id, event: "survey_reasons", reasons: "time_mismatch,stop_location", ...context });
     expect(fetchMock.mock.calls[0][1]?.keepalive).toBe(true);
     dismissSurvey("invite");
     expect(track).toHaveBeenCalledWith("survey_dismissed", { step: "invite", ...context });

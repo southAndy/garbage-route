@@ -30,7 +30,18 @@ npm run dev
 
 路線頁的查詢體驗問卷（`components/survey-prompt.tsx`）在點過站點或換過站之後再停留 20 秒才以底部抽屜跳出，搜尋面板或站點詳情開著時延後；同一次瀏覽只問一次，回答或關掉後記在 `localStorage`，14 天內不再出現。事件：`survey_shown`（`trigger`：`stop_dwell`／`stop_nav`、`visit`：`first`／`return`）、`survey_answered`（`outcome`：`found`／`not_found`）、`survey_reasons`（`reasons` 以逗號相接，略過為 `skipped`）、`survey_form_opened`、`survey_form_declined`、`survey_dismissed`（`step`：`question`／`reasons`／`invite`），都附帶 `route_id`、`city`、`district`，不含位置或自由文字。`survey_shown → survey_answered` 看問法與時機，`survey_answered → survey_form_opened` 看 Tally 表單值不值得留；`outcome=not_found` 的比例與 `reasons` 分布本身就是產品回饋，不必等表單。
 
-`survey_answered` 與 `survey_reasons` 兩種答案除了送 Vercel 事件，也會 POST 到 `app/api/survey/route.ts`，由它轉送到綁在 Tally 那份試算表上的 Apps Script（`scripts/survey-sheet-webhook.gs`，寫進 `quick_answers` 分頁，不碰 Tally 自己的分頁），這樣答案不受 Vercel Analytics 保留期限影響，也能和 Tally 的長答案放在同一個檔案裡交叉看。欄位與事件 property 完全相同（`event`、`outcome`、`reasons`、`route_id`、`city`、`district`、`visit`），沒有位置、自由文字或任何識別。需要 `SURVEY_SHEET_WEBHOOK_URL` 與 `SURVEY_SHEET_SECRET` 兩個環境變數，缺任何一個時 API 直接回 204、不另存；前端是 fire-and-forget，另存失敗不影響問卷與事件。Apps Script 的部署步驟寫在該檔案開頭。
+`survey_answered` 與 `survey_reasons` 除了送 Vercel 事件，也會 POST 到 `app/api/survey/route.ts` 並轉送 Apps Script（`scripts/survey-sheet-webhook.gs`）。新回饋用每次詢問產生的隨機 `feedback_id` 合併到 `quick_answers` 同一列，原因先到或重送也不重複新增；沒有 ID 的舊版頁面仍逐筆保存。ID 只識別這次回饋，不識別使用者。欄位包含 `received_at`、`updated_at`、`outcome`、`reasons`、`route_id`、`city`、`district`、`visit`、`feedback_id`、`reason_status`。原因狀態分為 `answered`、`skipped`、`not_received`、`not_applicable`；未提供原因不可當成已回答。保留既有列與人工備註，不收集精確位置或自由文字。
+
+啟用步驟：
+1. 開啟目標 Google Sheet → 擴充功能 → Apps Script。用 `scripts/survey-sheet-webhook.gs` **取代整份預設程式**，不可包在 `myFunction()` 裡。
+2. 專案設定 → 指令碼屬性，設定 `SURVEY_SECRET`（長隨機密鑰）、`SURVEY_SPREADSHEET_ID`（試算表網址 `/d/` 與 `/edit` 中間的 ID）。
+3. 部署網頁應用程式：執行身分「我」、存取權「任何人」，完成 Google 授權，複製 `/exec` 網址。試算表本身保持私人。
+4. 在網站伺服器環境設定 `SURVEY_SHEET_WEBHOOK_URL` 與 `SURVEY_SHEET_SECRET`；本機使用 `.env.local`，Vercel 正式環境設定後須重新部署。密鑰不可加 `NEXT_PUBLIC_`。
+5. 更新 Apps Script 後，管理部署 → 編輯 → 新版本，才會更新 `/exec`。
+6. 送一筆明確標記為測試的答案及原因，確認 Sheet 同一列出現兩者；重送不得新增列。舊資料保留。設定完成前不可宣稱已開始收件。
+
+目前前端另存為 fire-and-forget；缺少設定時 API 回 204，寫入失敗回 502，成功回 202。前端尚未等待確認或自動重試，因此畫面上的「已記下」不能當成 Google Sheet 寫入成功的證據。Tally 站點卡入口仍由 Tally 的整合設定收件，這條管道負責原頁詢問的回答。Google 官方部署說明：https://developers.google.com/apps-script/guides/web
+
 
 在 Analytics → Events 選擇相同期間與 `source`，以點擊事件的不重複訪客數除以曝光事件的不重複訪客數。事件次數會包含重複操作與重新進站，不可當成訪客使用率；若後台只提供事件次數，就只能比較曝光／點擊次數，不能得到不重複訪客使用率。此實作不建立額外訪客識別碼，訪客辨識交由 Vercel 處理。曝光依 IntersectionObserver 判斷幾何可見範圍，不代表使用者確實注意到按鈕；攔截追蹤的瀏覽器不會完整計入。
 

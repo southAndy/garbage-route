@@ -27,6 +27,7 @@ const VISITED_KEY = "visited-before";
 
 let state: SurveyPromptState = { visible: false, trigger: null, context: null, visit: "first" };
 let timer: number | null = null;
+let feedbackId: string | undefined;
 let pending = false;
 let blocked = false;
 let visitKind: SurveyVisit | null = null;
@@ -68,6 +69,7 @@ export function markVisited(): SurveyVisit {
 
 function show() {
   pending = false;
+  feedbackId = window.crypto.randomUUID();
   rememberSession();
   patch({ visible: true });
   send("survey_shown", { trigger: state.trigger ?? "stop_dwell", ...contextProps(), visit: state.visit });
@@ -92,13 +94,13 @@ export function setSurveyBlocked(next: boolean) {
 export function answerSurvey(outcome: SurveyOutcome) {
   markDone();
   send("survey_answered", { outcome, ...contextProps(), visit: state.visit });
-  if (state.context) store({ event: "survey_answered", outcome, visit: state.visit, ...state.context });
+  if (state.context) store({ feedback_id: feedbackId, event: "survey_answered", outcome, visit: state.visit, ...state.context });
 }
 
 export function submitSurveyReasons(reasons: string[]) {
   const joined = reasons.length ? reasons.join(",") : "skipped";
   send("survey_reasons", { reasons: joined, ...contextProps() });
-  if (state.context) store({ event: "survey_reasons", reasons: joined, ...state.context });
+  if (state.context) store({ feedback_id: feedbackId, event: "survey_reasons", reasons: joined, ...state.context });
 }
 
 export function openSurveyForm(outcome: SurveyOutcome) {
@@ -128,6 +130,6 @@ export function useSurveyPrompt() { return useSyncExternalStore(subscribe, () =>
 /** Test hook: back to a fresh page load. */
 export function resetSurveyPromptForTests() {
   if (timer !== null) { window.clearTimeout(timer); timer = null; }
-  pending = false; blocked = false; visitKind = null;
+  pending = false; blocked = false; visitKind = null; feedbackId = undefined;
   state = { visible: false, trigger: null, context: null, visit: "first" };
 }
