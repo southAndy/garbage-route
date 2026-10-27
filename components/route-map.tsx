@@ -4,17 +4,26 @@ import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { GeoJSONSource, Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
-import type { GarbageRoute, GarbageStop } from "@/lib/types";
+import type { CityCode, GarbageRoute, GarbageStop } from "@/lib/types";
 import { makeMapStyleCompatible } from "@/lib/map-style";
 import { createDisplayGeometries, suspiciousStopIds } from "@/lib/route-display";
 import { accuracyRingRadii, nearestStopDistanceMeters, ROUTE_FOCUS_LIMIT_METERS, type UserPosition } from "@/lib/user-location";
 
 import MapLocationControl from "./map-location-control";
+import MapAreaSearch from "./map-area-search";
 
 interface Props {
+  searchCity: CityCode;
+  searchDistrict: string;
+  searchQuery: string;
   route: GarbageRoute | null;
   selectedStop: GarbageStop | null;
   userPosition?: UserPosition | null;
+  picking?: { lat?: number; lng?: number; label: string } | null;
+  referenceBusy?: boolean;
+  referenceError?: string;
+  onConfirmReference?: (point: { lat: number; lng: number }) => void;
+  onCancelReference?: () => void;
   /** Changes when the stop popup grows or shrinks, so the selected stop is re-aimed at the gap above it. */
   popupLayout?: string;
   onSelectStop: (stop: GarbageStop) => void;
@@ -81,19 +90,22 @@ const activeHandlers: { onSelectStop: (stop: GarbageStop) => void; getRoute: () 
 };
 let cachedMap: CachedMap | null = null;
 
-export default function RouteMap({ route, selectedStop, userPosition = null, popupLayout = "", onSelectStop, onMapError }: Props) {
+export default function RouteMap({ searchCity, searchDistrict, searchQuery, route, selectedStop, userPosition = null, picking = null, referenceBusy = false, referenceError = "", onConfirmReference, onCancelReference, popupLayout = "", onSelectStop, onMapError }: Props) {
   const wrapper = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const routeRef = useRef(route);
+  const pickingRef = useRef(picking);
   // A re-adopted map that already fired "load" is usable immediately.
   const [ready, setReady] = useState(() => cachedMap?.loaded ?? false);
 
   useEffect(() => { routeRef.current = route; }, [route]);
+  useEffect(() => { pickingRef.current = picking; }, [picking]);
+
 
   useEffect(() => {
     const host = wrapper.current;
     if (!host) return;
-    activeHandlers.onSelectStop = onSelectStop;
+    activeHandlers.onSelectStop = (stop) => { if (!pickingRef.current) onSelectStop(stop); };
     activeHandlers.getRoute = () => routeRef.current;
 
     if (cachedMap) {
@@ -254,6 +266,7 @@ export default function RouteMap({ route, selectedStop, userPosition = null, pop
       features: userPosition ? [{ type: "Feature", geometry: { type: "Point", coordinates: [userPosition.lng, userPosition.lat] }, properties: accuracyRingRadii(userPosition) ?? {} }] : [],
     };
     (map.getSource("user-location") as GeoJSONSource).setData(featureCollection);
+    map.setPaintProperty("user-location-dot", "circle-color", userPosition?.referenceLabel ? "#7846ad" : "#2f6fd6");
   }, [ready, userPosition]);
 
   const flyToUser = () => {
@@ -275,12 +288,47 @@ export default function RouteMap({ route, selectedStop, userPosition = null, pop
     };
     (map.getSource("selected-stop") as GeoJSONSource).setData(featureCollection);
     if (selectedStop?.coordinateStatus === "valid") {
-      map.easeTo({ center: [selectedStop.longitude!, selectedStop.latitude!], zoom: Math.max(map.getZoom(), 15), offset: selectedStopOffset(map.getContainer()), duration: 550 });
+      if (userPosition?.referenceLabel && (nearestStopDistanceMeters(userPosition, [selectedStop]) ?? Infinity) <= ROUTE_FOCUS_LIMIT_METERS) {
+        const bounds = new maplibregl.LngLatBounds([userPosition.lng, userPosition.lat], [userPosition.lng, userPosition.lat]);
+        bounds.extend([selectedStop.longitude!, selectedStop.latitude!]);
+        const stage = map.getContainer().getBoundingClientRect();
+        const popup = map.getContainer().parentElement?.parentElement?.querySelector(".stop-popup")?.getBoundingClientRect();
+        const coversMap = popup && popup.left < stage.right && popup.right > stage.left;
+        const bottom = coversMap ? Math.min(stage.height - 180, Math.max(85, stage.bottom - popup.top + 30)) : 85;
+        map.fitBounds(bounds, { padding: { top: 110, bottom: Math.max(40, bottom), left: 50, right: 50 }, maxZoom: 17, duration: 550 });
+      } else {
+        map.easeTo({ center: [selectedStop.longitude!, selectedStop.latitude!], zoom: Math.max(map.getZoom(), 15), offset: selectedStopOffset(map.getContainer()), duration: 550 });
+      }
     }
-  }, [ready, selectedStop, popupLayout]);
+  }, [ready, selectedStop, popupLayout, userPosition]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (ready && map && picking?.lat !== undefined && picking.lng !== undefined) {
+      map.easeTo({ center: [picking.lng, picking.lat], zoom: 17, duration: 500 });
+    }
+  }, [ready, picking]);
 
   return <>
     <div ref={wrapper} className="map-canvas" aria-label="選中垃圾車路線地圖" />
-    {ready && (route || userPosition) && <MapLocationControl route={route} onFocusPosition={flyToUser} />}
+    {ready && !picking && (route || userPosition) && <MapLocationControl route={route} onFocusPosition={flyToUser} />}
+    {ready && picking && <>
+      <div className="reference-crosshair" aria-hidden="true">＋</div>
+      <div className="reference-picker" role="region" aria-label="確認參考位置">
+        <MapAreaSearch city={searchCity} district={searchDistrict} initialQuery={searchQuery} disabled={referenceBusy} onArea={(area) => {
+          const map = mapRef.current;
+          if (!map) return;
+          map.fitBounds(area.bounds, { padding: 45, maxZoom: 17, duration: 650 });
+        }} />
+        <strong>移動地圖，將十字對準要查詢的位置</strong>
+        <p>{picking.label} · 可拖曳或用方向鍵移動地圖。確認後以此座標查詢附近站點，僅供本次查詢使用。</p>
+        {referenceError && <p role="alert">{referenceError}</p>}
+        <div><button type="button" disabled={referenceBusy} onClick={() => {
+          const center = mapRef.current?.getCenter();
+          if (center) onConfirmReference?.({ lat: center.lat, lng: center.lng });
+        }}>{referenceBusy ? "查詢附近站點…" : "以此位置找附近站點"}</button><button type="button" onClick={onCancelReference}>取消</button></div>
+      </div>
+    </>}
+    {ready && !picking && userPosition?.referenceLabel && <div className="reference-map-label">紫點：{userPosition.referenceLabel}</div>}
   </>;
 }

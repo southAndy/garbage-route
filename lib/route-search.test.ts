@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MATCHED_STOP_LIMIT, searchRoute, splitByQuery } from "./route-search";
+import { MATCHED_STOP_LIMIT, searchRoute, searchRoutes, splitByQuery } from "./route-search";
 import type { GarbageRoute, GarbageStop } from "./types";
 
 const days = [false, true, true, false, true, true, true];
@@ -44,6 +44,36 @@ describe("searchRoute", () => {
     const summary = searchRoute(many, "永平路");
     expect(summary?.matches?.count).toBe(MATCHED_STOP_LIMIT + 5);
     expect(summary?.matches?.stops).toHaveLength(MATCHED_STOP_LIMIT);
+  });
+});
+
+describe("address search", () => {
+  it("extracts an address from a question and keeps exact matches across routes", () => {
+    const other = { ...route, id: "other", stops: [stop(1, "永平路999號", "14:00")] };
+    const results = searchRoutes([other, route], "我家住在新北市永和區永平路１６４號建成中醫，請問垃圾車幾點到？");
+    expect(results).toHaveLength(1);
+    expect(results[0].matches).toMatchObject({ count: 1, query: "永平路164號", broadened: false });
+    expect(results[0].matches?.stops[0].name).toBe("永平路164號");
+  });
+
+  it("broadens a missing house number to the street with explicit metadata", () => {
+    for (const query of ["永平路293號", "我家是住在永平路 ２９３ 號建成中醫.請問垃圾車什麼時候到站\n"]) {
+      const results = searchRoutes([route], query);
+      expect(results[0].matches).toMatchObject({ count: 2, query: "永平路", broadened: true });
+    }
+  });
+
+  it("preserves lane and alley numbers instead of returning the whole street", () => {
+    const laneRoute = { ...route, stops: [stop(1, "永平路12巷2弄3號", "13:00"), stop(2, "永平路12巷4弄3號", "14:00")] };
+    expect(searchRoutes([laneRoute], "永平路12巷2弄3號中醫診所")[0].matches).toMatchObject({ count: 1, query: "永平路12巷2弄3號", broadened: false });
+  });
+
+  it("preserves existing keyword searches and does not guess unknown shops or intersections", () => {
+    expect(searchRoutes([route], "永平路")).toEqual([searchRoute(route, "永平路")]);
+    expect(searchRoutes([route], "")).toEqual([searchRoute(route, "")]);
+    expect(searchRoutes([route], "建成中醫")).toEqual([]);
+    expect(searchRoutes([route], "永平路與和平街交叉口")).toEqual([]);
+    expect(searchRoutes([], "景新街293號")).toEqual([]);
   });
 });
 

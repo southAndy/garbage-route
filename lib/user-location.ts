@@ -8,6 +8,8 @@ export interface UserPosition {
   /** Metres, as reported by the device; null when unknown. */
   accuracy: number | null;
   locatedAt: number;
+  /** Absent for a device fix; reference points never imply device location. */
+  referenceLabel?: string;
 }
 
 /** A location fix, optionally accompanied by a nearby-route search result. */

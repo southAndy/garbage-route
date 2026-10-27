@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import MapLocationControl from "./map-location-control";
-import { clearLocationSession, getLocationSession } from "../lib/user-location";
+import { clearLocationSession, getLocationSession, setLocationSession } from "../lib/user-location";
 import type { GarbageRoute } from "../lib/types";
 
 const route = { stops: [
@@ -19,6 +19,17 @@ beforeEach(() => {
 afterEach(() => { cleanup(); clearLocationSession(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
 describe("map location control", () => {
+  it("labels a manual reference separately and never requests geolocation to focus it", () => {
+    setLocationSession({ nearby: null, position: { lat: 25, lng: 121.5, accuracy: null, locatedAt: 1, referenceLabel: "手動選點" } });
+    const focus = vi.fn();
+    render(<MapLocationControl route={route} onFocusPosition={focus} />);
+    fireEvent.click(screen.getByRole("button", { name: "回到參考位置" }));
+    expect(focus).toHaveBeenCalledOnce();
+    expect(getCurrentPosition).not.toHaveBeenCalled();
+    expect(screen.getByText("紫點為手動選點。")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "清除參考位置" }));
+    expect(getLocationSession()).toBeNull();
+  });
   it("共用右側圖示回到位置並切換面板，Escape 收合後焦點回到圖示", () => {
     const onFocusPosition = vi.fn();
     render(<MapLocationControl route={route} onFocusPosition={onFocusPosition} />);

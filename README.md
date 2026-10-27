@@ -20,7 +20,20 @@ npm run dev
 
 ## 定位按鈕分析（Vercel Web Analytics）
 
-自訂事件需 Vercel Pro 或 Enterprise，並啟用 Web Analytics。`location_button_viewed` 在按鈕至少 50% 進入可視區域時送出，每次元件掛載最多一次；`location_button_clicked` 在每次有效點擊時送出，不以授權或定位成功為條件。點擊若早於曝光回呼，會先補記曝光。兩者只附帶 `source`，不傳送座標或搜尋文字。
+自訂事件需 Vercel Pro 或 Enterprise，並啟用 Web Analytics。`location_button_viewed` 在按鈕至少 50% 進入可視區域時送出，每次元件掛載最多一次；`location_button_clicked` 在每次有效點擊時送出，不以授權或定位成功為條件。點擊若早於曝光回呼，會先補記曝光。兩者只附帶 `source`，不傳送座標或搜尋文字。 搜尋面板改為下拉選單後，`source` 仍為 `route_search`：曝光指選單至少 50% 可見，點擊僅在選取「使用／改用目前位置」時記錄；開啟選單或選「地圖選點」不計為定位點擊。另以 `location_method_selected` 的 `method=map/device` 區分選擇方式。由於入口外觀已改變，改版前後的曝光轉換率需分期比較。
+
+地圖選點事件（不帶地址、關鍵字、座標、行政區或錯誤訊息）：
+
+| 事件 | 觸發時機／欄位 |
+| --- | --- |
+| `map_picker_opened` | 開啟地圖選點 |
+| `map_picker_cancelled` | 使用者按取消 |
+| `map_area_search_clicked` | 有效送出關鍵字縮小範圍 |
+| `map_area_search_result` | `status=success/empty/error` |
+| `map_picker_confirm_clicked` | 確認參考點、送出附近站點查詢 |
+| `map_picker_result` | `status=success/empty/error`；空結果包含服務範圍外或範圍內無站點 |
+
+取消或改字造成的中止不記為失敗；每次重試是新的點擊與結果。可用選點開啟 → 確認 → 成功結果評估使用流程，但事件次數含重試，不等於不重複使用者。保留原本定位事件，兩套分開分析。
 
 入口：`route_search`（路線查詢區）、`district_search`（行政區頁）、`map`（地圖定位／回到我的位置圖示）、`map_retry`（展開面板的更新／重試）。清除定位不計入。地圖圖示在已有位置時的回到位置與面板切換也算點擊；分析首次定位需求時優先查看 `route_search`。
 
@@ -137,6 +150,12 @@ npm run audit:coordinates
 掃描器會找出「同時遠離前後站、但前後站彼此接近」的孤立座標，以及超過 10 公里的相鄰站區段，並將待人工確認項目寫入 `data/suspicious-coordinates.json`。已知但未達自動門檻的項目可加入 `data/coordinate-flags.json`，重新掃描與同步時會一併保留。清單只標示可疑資料，不會自行修改官方座標；一般地圖會以黃色問號標記相關站點，並以橘色虛線保留可疑的原始連線。
 
 預設底圖使用免 API Key 的 OpenFreeMap Liberty 向量樣式，資料來自 OpenStreetMap；可透過 `NEXT_PUBLIC_MAP_STYLE_URL` 替換成 MapTiler、Stadia Maps 或自架 MapLibre 樣式。正式上線前仍應依預估流量重新確認圖磚服務條款與可用性需求。
+
+參考位置：從「選擇參考位置」下拉選單選「地圖選點（免定位）」；選單中的「使用目前位置」才會啟動裝置定位流程。距離為參考點到停靠站的直線距離，並非步行路線。參考點在本次頁面瀏覽期間保留，切換路線不會消失，重新整理後清除。
+
+選點面板的「用關鍵字縮小範圍」透過 `/api/v1/search-area` 查詢所選行政區的本地站點資料，依符合文字且座標可信的站點縮放地圖，不呼叫外部地理編碼服務。支援路名、巷弄及地址回退搜尋；多個班次的同座標站點會去重，路線上其他未符合的站點不納入範圍。這是輔助選點的分布範圍，不代表查到確切門牌，仍須手動確認十字位置。
+
+目前介面已移除外部地址查詢入口，不會送出 Photon 查詢。以下為保留的 `/api/v1/places` 端點設定：`PHOTON_API_URL` 可替換為自架或代管的 Photon 相容端點。預設公共 demo 僅用於低流量試用：[Photon 使用說明](https://github.com/komoot/photon#demo-server) 要求合理用量、不保證可用性。此功能僅按鈕送出，沒有逐字自動完成；伺服器每個執行個體限制每秒一個上游請求，並設有最多 100 筆、5 分鐘的記憶體快取與 8 秒逾時。多執行個體上線須另設全站限流或改用可承受流量的服務。地址不寫入持久儲存或應用程式日誌，但會送給查詢供應商。查無結果、逾時或街道層級結果均可改用地圖確認選點，不將概略座標當成門牌。
 
 ## 限時收受點
 

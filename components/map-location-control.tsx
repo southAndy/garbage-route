@@ -49,10 +49,10 @@ export default function MapLocationControl({ route, onFocusPosition }: { route: 
   const distance = position && route ? nearestStopDistanceMeters(position, route.stops.filter((stop) => !suspicious.has(stop.id))) : null;
   const error = state === "failed" ? "定位失敗，請稍後再試。" : locateMessage(state, typeof navigator === "undefined" ? "" : navigator.userAgent);
 
-  const label = state === "locating" ? "定位中…" : position ? "回到我的位置" : "定位我的位置";
+  const label = state === "locating" ? "定位中…" : position ? (position.referenceLabel ? "回到參考位置" : "回到我的位置") : "定位我的位置";
 
   return <>
-    <TrackedLocationButton source="map" ref={trigger} type="button" className={`locate-me-button${position ? " has-position" : ""}`} aria-label={label} title={label} aria-expanded={expanded} aria-controls={panelId} disabled={state === "locating"} aria-busy={state === "locating"} onClick={() => {
+    <TrackedLocationButton source="map" ref={trigger} type="button" className={`locate-me-button${position ? " has-position" : ""}${position?.referenceLabel ? " is-reference" : ""}`} aria-label={label} title={label} aria-expanded={expanded} aria-controls={panelId} disabled={state === "locating"} aria-busy={state === "locating"} onClick={() => {
       if (position) { onFocusPosition?.(); setExpanded((value) => !value); }
       else locate();
     }}><span aria-hidden="true" /></TrackedLocationButton>
@@ -61,19 +61,19 @@ export default function MapLocationControl({ route, onFocusPosition }: { route: 
     }}>
     <div className="map-location-actions">
       <TrackedLocationButton source="map_retry" type="button" className="locate-button" onClick={locate} disabled={state === "locating"} aria-busy={state === "locating"}>
-        {state === "locating" ? "定位中…" : position ? "更新我的位置" : "重新定位"}
+        {state === "locating" ? "定位中…" : position ? (position.referenceLabel ? "改用我的位置" : "更新我的位置") : "重新定位"}
       </TrackedLocationButton>
       {position && expanded && <button type="button" className="clear-nearby" onClick={() => {
         request.current += 1; pending.current = false;
         clearLocationSession(); setState("idle"); collapse();
-      }}>清除定位</button>}
+      }}>{position.referenceLabel ? "清除參考位置" : "清除定位"}</button>}
       {expanded && <button type="button" className="clear-nearby" aria-expanded={true} onClick={collapse}>收合</button>}
     </div>
     <div role="status">
       {expanded && <>
       {error && <p>{error}</p>}
       {position && <>
-        <p>藍點為你的位置{position.accuracy !== null ? `，定位誤差約 ${formatDistance(position.accuracy)}` : ""}。</p>
+        <p>{position.referenceLabel ? `紫點為${position.referenceLabel}` : "藍點為你的位置"}{position.accuracy !== null ? `，定位誤差約 ${formatDistance(position.accuracy)}` : ""}。</p>
         {route && <p>{distance === null ? "此路線暫無可確認距離的站點。" : `距此路線最近站點約 ${formatDistance(distance)}（直線距離）。`}</p>}
         {error && <p>地圖仍顯示上次成功定位的位置。</p>}
       </>}

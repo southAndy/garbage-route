@@ -45,6 +45,42 @@ export function searchRoute(route: GarbageRoute, query: string): RouteSummary | 
   return { ...toSummary(route), matches: { count: matched.length, stops: matched.slice(0, MATCHED_STOP_LIMIT).map(toMatchedStop) } };
 }
 
+/** Resolve an address across the district before broadening to its street. */
+export function searchRoutes(routes: GarbageRoute[], query: string): RouteSummary[] {
+  const find = (term: string) => routes.map((route) => searchRoute(route, term))
+    .filter((result): result is RouteSummary => result !== null);
+  const direct = find(query);
+  if (direct.length || !query.trim()) return direct;
+
+  // Recognize known streets even inside conversational text, without guessing
+  // where a name starts in phrases such as「我家是住在景新街…」.
+  const compact = query.replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xfee0)).replace(/\s+/g, "");
+  const streets = new Set<string>();
+  for (const route of routes) {
+    for (const stop of route.stops) {
+      for (const text of [stop.address, stop.name]) {
+        const local = (text ?? "").replace(/^(?:臺北市|台北市|新北市)/, "").replace(new RegExp(`^${route.district}`), "");
+        const street = local.match(/^[\p{Script=Han}]{1,12}?(?:大道|路|街)(?:[一二三四五六七八九十\d]+段)?/u)?.[0];
+        if (street && compact.includes(street)) streets.add(street);
+      }
+    }
+  }
+  const candidates = [...streets].filter((street) => ![...streets].some((other) => other !== street && other.includes(street)));
+  // An intersection can contain multiple streets; do not silently pick one.
+  if (candidates.length !== 1) return [];
+  const street = candidates[0];
+  const tail = compact.slice(compact.indexOf(street) + street.length);
+  const addressPart = tail.match(/^(?:\d+(?:之\d+)?(?:巷|弄|號)(?:之\d+)?)+/)?.[0] ?? "";
+  const address = street + addressPart;
+  const exact = find(address);
+  const broadened = addressPart !== "" && exact.length === 0;
+  const matchedQuery = broadened ? street : address;
+  return (broadened ? find(street) : exact).map((result) => ({
+    ...result,
+    matches: result.matches && { ...result.matches, query: matchedQuery, broadened },
+  }));
+}
+
 /** Splits `text` into [plain, match, plain, match, …] so a card can highlight the searched word. */
 export function splitByQuery(text: string, query: string): string[] {
   const needle = normalizeQuery(query);

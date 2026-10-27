@@ -83,5 +83,5 @@ export interface RouteSummary {
   endStopName: string | null;
   stopCount: number;
   /** Only on text-search results: the stops whose name, address or village matched, in route order. */
-  matches?: { count: number; stops: MatchedStop[] };
+  matches?: { count: number; stops: MatchedStop[]; query?: string; broadened?: boolean };
 }

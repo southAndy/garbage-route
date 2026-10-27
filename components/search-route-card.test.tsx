@@ -20,6 +20,13 @@ const item: RouteSummary = {
 const satNoon = { weekday: 6, minutes: 13 * 60 + 5 };
 
 describe("SearchRouteCard", () => {
+  it("labels broadened address results and highlights the resolved street", () => {
+    const html = renderToStaticMarkup(<SearchRouteCard item={{ ...item, matches: { ...item.matches!, query: "永平路", broadened: true } }} query="我家住永平路293號中醫診所" />);
+    expect(html).toContain("查無符合地址的站點，已擴大搜尋「永平路」");
+    expect(html).toContain("請在地圖確認停靠位置");
+    expect(html).toContain("<mark>永平路</mark>");
+    expect(html).not.toContain("我家住");
+  });
   it("沒有時鐘時從第一個匹配站點列出五站、加粗關鍵字並點出其餘站數", () => {
     const html = renderToStaticMarkup(<SearchRouteCard item={item} query="永平路" />);
     for (const text of ["四區午13", "<mark>永平路</mark>206巷口", "13:01", "13:40", "「永平路」上另有 2 站", "全線 12:42—14:17", "共 46 站"]) expect(html).toContain(text);

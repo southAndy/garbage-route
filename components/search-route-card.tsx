@@ -32,7 +32,8 @@ function statusPill(timing: SearchRouteTiming | undefined, nextTime: string | nu
  * demoted to the footer. Stop rows carry `data-stop-id` like nearby cards, so a tap on a
  * row opens the route focused on that stop.
  */
-export default function SearchRouteCard({ item, query, clock, timing, fastest = false }: { item: RouteSummary; query: string; clock?: TaipeiClock; timing?: SearchRouteTiming; fastest?: boolean }) {
+export default function SearchRouteCard({ item, query: requestedQuery, clock, timing, fastest = false }: { item: RouteSummary; query: string; clock?: TaipeiClock; timing?: SearchRouteTiming; fastest?: boolean }) {
+  const query = item.matches?.query ?? requestedQuery;
   const stops = item.matches?.stops ?? [];
   const count = item.matches?.count ?? 0;
   const start = timing && timing.nextIndex > 0 ? timing.nextIndex : 0;
@@ -45,6 +46,7 @@ export default function SearchRouteCard({ item, query, clock, timing, fastest = 
       {statusPill(timing, nextTime, fastest)}
       <i>›</i>
     </span>
+    {item.matches?.broadened && <span className="route-meta">查無符合地址的站點，已擴大搜尋「{query}」；請在地圖確認停靠位置。</span>}
     {shown.length > 0 ? <ul className="nearby-stops matched-stops" aria-label={`「${query}」的站點`}>
       {shown.map((stop) => {
         const status = clock ? classifyStopTime(stop, clock) : null;

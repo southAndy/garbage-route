@@ -4,7 +4,8 @@ import suspiciousCoordinatesData from "@/data/suspicious-coordinates.json";
 import type { SuspiciousCoordinateReport } from "./coordinate-quality";
 import { createNearbyIndex, searchNearby, type GeoPoint, type NearbyIndex, type NearbyRadius } from "./nearby-search";
 import { toSummary } from "./route-summary";
-import { searchRoute } from "./route-search";
+import { searchRoutes } from "./route-search";
+import { matchedStopArea } from "./search-area";
 import type { CityCode, GarbageRoute, RouteCoordinateWarning, RouteSummary } from "./types";
 
 export { CITY_NAMES, cityPath, districtPath, parseCityCode, routePath } from "./paths";
@@ -56,13 +57,16 @@ export function getDistricts(city: CityCode) {
 
 /** Routes of a district; with a query, only those whose name or stops match, each carrying its matched stops. */
 export function findRoutes(city: CityCode, district: string, query = ""): RouteSummary[] {
-  return routes
-    .filter((route) => route.cityCode === city && route.district === district)
-    .map((route) => searchRoute(route, query))
-    .filter((summary): summary is RouteSummary => summary !== null);
+  return searchRoutes(routes.filter((route) => route.cityCode === city && route.district === district), query);
 }
 
 let nearbyIndex: NearbyIndex | null = null;
+
+export function findSearchArea(city: CityCode, district: string, query: string) {
+  const scoped = routes.filter((route) => route.cityCode === city && route.district === district);
+  const excluded = new Set([...warningsByRoute.values()].flat().flatMap((warning) => warning.affectedStopIds));
+  return matchedStopArea(scoped, searchRoutes(scoped, query), query, excluded);
+}
 
 export function findNearby(point: GeoPoint, radius?: NearbyRadius) {
   if (!nearbyIndex) {
