@@ -35,7 +35,7 @@ describe("Apps Script webhook", () => {
     const answer = { ...base, event: "survey_answered", outcome: "not_found", visit: "first" };
     expect(f.post(answer)).toBe("ok");
     expect(f.record().reason_status).toBe("not_received");
-    f.rows[0].push("operator_note"); f.rows[1].push("keep me");
+    f.rows[0].push("operator_note"); f.rows[1][f.rows[0].length - 1] = "keep me";
     expect(f.post({ ...base, event: "survey_reasons", reasons: "no_route" })).toBe("ok");
     expect(f.post(answer)).toBe("ok");
     expect(f.rows).toHaveLength(2);
@@ -67,5 +67,36 @@ describe("Apps Script webhook", () => {
     expect(f.rows).toHaveLength(3);
     expect(f.rows[1][4]).toBe("old route");
     expect(f.rows[0]).toContain("feedback_id");
+  });
+
+  it("新版尚未完成不算失敗，也不需要原因", () => {
+    const f = fixture();
+    expect(f.post({ ...base, survey_version: "2", event: "survey_answered", outcome: "in_progress", visit: "first" })).toBe("ok");
+    expect(f.record()).toMatchObject({ outcome: "in_progress", survey_version: "2", reason_status: "not_applicable" });
+    expect(f.post({ ...base, event: "survey_answered", outcome: "in_progress", visit: "first" })).toBe("bad request");
+  });
+
+  it("改選先到及重送仍只保留最後原因，原因快照本身含答案", () => {
+    const f = fixture();
+    const reason = { ...base, survey_version: "2", event: "survey_reasons", outcome: "not_found", visit: "return", reasons: "unreadable_schedule", reason_revision: 2 };
+    expect(f.post(reason)).toBe("ok");
+    expect(f.record()).toMatchObject({ outcome: "not_found", visit: "return", reasons: "unreadable_schedule", reason_revision: 2, reason_status: "answered" });
+    f.post({ ...reason, reasons: "hard_to_use", reason_revision: 1 });
+    f.post(reason);
+    f.post({ ...base, survey_version: "2", event: "survey_answered", outcome: "not_found", visit: "return" });
+    expect(f.rows).toHaveLength(2);
+    expect(f.record()).toMatchObject({ reasons: "unreadable_schedule", reason_revision: 2, reason_status: "answered" });
+    f.post({ ...reason, reasons: "skipped", reason_revision: 3 });
+    expect(f.record()).toMatchObject({ reasons: "skipped", reason_status: "skipped", reason_revision: 3 });
+  });
+
+  it("新版拒絕缺少序號、非單選與不完整的原因", () => {
+    const f = fixture();
+    const reason = { ...base, survey_version: "2", event: "survey_reasons", outcome: "not_found", visit: "first", reasons: "hard_to_use", reason_revision: 1 };
+    for (const invalid of [
+      { reason_revision: undefined }, { reason_revision: 1.5 }, { reason_revision: 1_000_001 },
+      { reasons: "no_route,hard_to_use" }, { reasons: "stop_location" }, { outcome: undefined }, { visit: undefined }, { feedback_id: undefined },
+    ]) expect(f.post({ ...reason, ...invalid })).toBe("bad request");
+    expect(f.rows).toHaveLength(0);
   });
 });

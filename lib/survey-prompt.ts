@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from "react";
 import { track } from "@vercel/analytics";
 import type { SurveyRecord } from "./survey-store";
+import { SURVEY_VERSION, type SurveyOutcome, type SurveyReason } from "./survey-options";
+export type { SurveyOutcome } from "./survey-options";
 
 /**
  * The route-page survey: a two-step sheet (one tap "did you find it?", optional reasons, then an
@@ -14,7 +16,6 @@ import type { SurveyRecord } from "./survey-store";
  */
 export type SurveyTrigger = "stop_dwell" | "stop_nav";
 export type SurveyStep = "question" | "reasons" | "invite";
-export type SurveyOutcome = "found" | "not_found";
 export type SurveyVisit = "first" | "return";
 export interface SurveyRouteContext { route_id: string; city: string; district: string }
 export interface SurveyPromptState { visible: boolean; trigger: SurveyTrigger | null; context: SurveyRouteContext | null; visit: SurveyVisit }
@@ -28,6 +29,8 @@ const VISITED_KEY = "visited-before";
 let state: SurveyPromptState = { visible: false, trigger: null, context: null, visit: "first" };
 let timer: number | null = null;
 let feedbackId: string | undefined;
+let selectedReason: SurveyReason | "skipped" | undefined;
+let reasonRevision = 0;
 let pending = false;
 let blocked = false;
 let visitKind: SurveyVisit | null = null;
@@ -50,7 +53,7 @@ function markDone() { writeLocal(DONE_KEY, String(Date.now())); }
 function send(event: string, properties: Record<string, string>) {
   try { track(event, properties); } catch { /* Analytics never blocks the survey. */ }
 }
-function contextProps() { return state.context ? { ...state.context } : {}; }
+function contextProps() { return { ...state.context, survey_version: SURVEY_VERSION }; }
 /** Fire-and-forget; `keepalive` lets the request finish even if the tab closes right after. */
 function store(record: SurveyRecord) {
   try {
@@ -70,6 +73,8 @@ export function markVisited(): SurveyVisit {
 function show() {
   pending = false;
   feedbackId = window.crypto.randomUUID();
+  selectedReason = undefined;
+  reasonRevision = 0;
   rememberSession();
   patch({ visible: true });
   send("survey_shown", { trigger: state.trigger ?? "stop_dwell", ...contextProps(), visit: state.visit });
@@ -94,13 +99,20 @@ export function setSurveyBlocked(next: boolean) {
 export function answerSurvey(outcome: SurveyOutcome) {
   markDone();
   send("survey_answered", { outcome, ...contextProps(), visit: state.visit });
-  if (state.context) store({ feedback_id: feedbackId, event: "survey_answered", outcome, visit: state.visit, ...state.context });
+  if (state.context) store({ feedback_id: feedbackId, survey_version: SURVEY_VERSION, event: "survey_answered", outcome, visit: state.visit, ...state.context });
 }
 
-export function submitSurveyReasons(reasons: string[]) {
-  const joined = reasons.length ? reasons.join(",") : "skipped";
-  send("survey_reasons", { reasons: joined, ...contextProps() });
-  if (state.context) store({ feedback_id: feedbackId, event: "survey_reasons", reasons: joined, ...state.context });
+export function submitSurveyReasons(reason: SurveyReason | null) {
+  const next = reason ?? "skipped";
+  if (next === selectedReason) return;
+  const event = reasonRevision === 0 ? "survey_reasons" : "survey_reasons_changed";
+  selectedReason = next;
+  reasonRevision += 1;
+  send(event, { reasons: next, outcome: "not_found", reason_revision: String(reasonRevision), ...contextProps() });
+  // A complete snapshot keeps the answer attached even if its first request was lost.
+  // Revisions let the sheet ignore late-arriving older selections.
+  if (state.context) store({ feedback_id: feedbackId, survey_version: SURVEY_VERSION, event: "survey_reasons", reasons: next,
+    reason_revision: reasonRevision, outcome: "not_found", visit: state.visit, ...state.context });
 }
 
 export function openSurveyForm(outcome: SurveyOutcome) {
@@ -131,5 +143,6 @@ export function useSurveyPrompt() { return useSyncExternalStore(subscribe, () =>
 export function resetSurveyPromptForTests() {
   if (timer !== null) { window.clearTimeout(timer); timer = null; }
   pending = false; blocked = false; visitKind = null; feedbackId = undefined;
+  selectedReason = undefined; reasonRevision = 0;
   state = { visible: false, trigger: null, context: null, visit: "first" };
 }

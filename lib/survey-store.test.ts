@@ -22,6 +22,19 @@ describe("survey store", () => {
     expect(surveyStoreConfig({ SURVEY_SHEET_WEBHOOK_URL: ` ${config.url} `, SURVEY_SHEET_SECRET: config.secret })).toEqual(config);
   });
 
+  it("新版接受尚未完成，原因必須是附帶版本與序號的單選快照", () => {
+    const v2 = { ...answered, survey_version: "2", feedback_id: "00000000-0000-4000-8000-000000000001" };
+    expect(surveyRecordSchema.safeParse({ ...v2, outcome: "in_progress" }).success).toBe(true);
+    expect(surveyRecordSchema.safeParse({ ...answered, outcome: "in_progress" }).success).toBe(false);
+    expect(surveyRecordSchema.safeParse({ ...v2, feedback_id: undefined }).success).toBe(false);
+    const reason = { ...v2, event: "survey_reasons", outcome: "not_found", reasons: "unreadable_schedule", reason_revision: 1 };
+    expect(surveyRecordSchema.parse(reason)).toMatchObject(reason);
+    for (const invalid of [
+      { reasons: "no_route,hard_to_use" }, { reasons: "stop_location" }, { reason_revision: 0 },
+      { reason_revision: 1.5 }, { reason_revision: 1_000_001 }, { outcome: "found" }, { visit: undefined },
+    ]) expect(surveyRecordSchema.safeParse({ ...reason, ...invalid }).success).toBe(false);
+  });
+
   it("把 secret 放進 body、跟著 302 走，回應不是 ok 就丟錯", async () => {
     const fetchImpl = vi.fn(async () => new Response("ok\n", { status: 200 }));
     await appendSurveyRecord(answered, config, fetchImpl as unknown as typeof fetch);

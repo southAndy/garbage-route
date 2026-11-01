@@ -11,6 +11,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 
 const context = { route_id: "ntp-234001", city: "NTP", district: "永和區" };
+const versionedContext = { ...context, survey_version: "2" };
 function Probe() { return createElement("i", null, String(useSurveyPrompt().visible)); }
 
 describe("survey prompt", () => {
@@ -22,7 +23,7 @@ describe("survey prompt", () => {
     vi.advanceTimersByTime(SURVEY_DWELL_MS - 1);
     expect(track).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
-    expect(track).toHaveBeenCalledWith("survey_shown", { trigger: "stop_dwell", ...context, visit: "first" });
+    expect(track).toHaveBeenCalledWith("survey_shown", { trigger: "stop_dwell", ...versionedContext, visit: "first" });
     expect(window.sessionStorage.getItem("survey-prompt-shown")).toBe("1");
   });
 
@@ -47,16 +48,16 @@ describe("survey prompt", () => {
     requestSurveyPrompt("stop_dwell", context);
     vi.advanceTimersByTime(SURVEY_DWELL_MS);
     answerSurvey("not_found");
-    submitSurveyReasons(["time_mismatch", "stop_location"]);
-    expect(track).toHaveBeenCalledWith("survey_answered", { outcome: "not_found", ...context, visit: "first" });
-    expect(track).toHaveBeenCalledWith("survey_reasons", { reasons: "time_mismatch,stop_location", ...context });
+    submitSurveyReasons("time_mismatch");
+    expect(track).toHaveBeenCalledWith("survey_answered", { outcome: "not_found", ...versionedContext, visit: "first" });
+    expect(track).toHaveBeenCalledWith("survey_reasons", { reasons: "time_mismatch", outcome: "not_found", reason_revision: "1", ...versionedContext });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const posted = fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
-    expect(posted[0]).toEqual({ feedback_id: expect.any(String), event: "survey_answered", outcome: "not_found", visit: "first", ...context });
-    expect(posted[1]).toEqual({ feedback_id: posted[0].feedback_id, event: "survey_reasons", reasons: "time_mismatch,stop_location", ...context });
+    expect(posted[0]).toEqual({ feedback_id: expect.any(String), event: "survey_answered", outcome: "not_found", visit: "first", ...versionedContext });
+    expect(posted[1]).toEqual({ feedback_id: posted[0].feedback_id, event: "survey_reasons", reasons: "time_mismatch", outcome: "not_found", visit: "first", reason_revision: 1, ...versionedContext });
     expect(fetchMock.mock.calls[0][1]?.keepalive).toBe(true);
     dismissSurvey("invite");
-    expect(track).toHaveBeenCalledWith("survey_dismissed", { step: "invite", ...context });
+    expect(track).toHaveBeenCalledWith("survey_dismissed", { step: "invite", ...versionedContext });
     expect(Number(window.localStorage.getItem("survey-prompt-done"))).toBeGreaterThan(0);
 
     track.mockClear(); resetSurveyPromptForTests(); window.sessionStorage.clear();

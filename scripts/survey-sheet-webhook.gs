@@ -9,7 +9,7 @@
  * older clients without an ID retain the original append-only behavior.
  */
 var SHEET_NAME = "quick_answers";
-var COLUMNS = ["received_at", "event", "outcome", "reasons", "route_id", "city", "district", "visit", "feedback_id", "updated_at", "reason_status"];
+var COLUMNS = ["received_at", "event", "outcome", "reasons", "route_id", "city", "district", "visit", "feedback_id", "updated_at", "reason_status", "survey_version", "reason_revision"];
 
 function doPost(e) {
   var properties = PropertiesService.getScriptProperties();
@@ -47,8 +47,11 @@ function doPost(e) {
     function get(name) { return existing[headers.indexOf(name)]; }
     // The same feedback ID cannot move to a different route.
     if (row && ["route_id", "city", "district"].some(function (name) { return get(name) !== body[name]; })) return reply("conflict");
+    // Ignore duplicate or delayed older selections; keep the latest user choice.
+    if (row && body.survey_version === "2" && body.event === "survey_reasons" && Number(get("reason_revision")) >= body.reason_revision) return reply("ok");
     var patch = { updated_at: new Date() };
     if (!row) patch.received_at = new Date();
+    patch.survey_version = body.survey_version || get("survey_version") || "1";
     ["route_id", "city", "district", "feedback_id"].forEach(function (name) {
       if (typeof body[name] === "string") patch[name] = body[name];
     });
@@ -57,11 +60,16 @@ function doPost(e) {
       patch.visit = body.visit;
     } else {
       patch.reasons = body.reasons;
+      if (body.survey_version === "2") {
+        patch.reason_revision = body.reason_revision;
+        patch.outcome = body.outcome;
+        patch.visit = body.visit;
+      }
     }
     var outcome = patch.outcome || get("outcome");
     var reasons = patch.reasons || get("reasons");
     patch.event = outcome ? "survey_answered" : body.event;
-    patch.reason_status = reasons ? (reasons === "skipped" ? "skipped" : "answered") : (outcome === "found" ? "not_applicable" : "not_received");
+    patch.reason_status = reasons ? (reasons === "skipped" ? "skipped" : "answered") : (outcome === "found" || outcome === "in_progress" ? "not_applicable" : "not_received");
     row = row || sheet.getLastRow() + 1;
     // Only update owned fields; never rewrite operator formulas or notes.
     Object.keys(patch).forEach(function (name) {
@@ -75,7 +83,15 @@ function doPost(e) {
 function validRecord(body) {
   if (["route_id", "city", "district"].some(function (name) { return typeof body[name] !== "string" || !body[name].trim() || body[name].length > 64; })) return false;
   if (body.feedback_id !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.feedback_id)) return false;
-  if (body.event === "survey_answered") return /^(found|not_found)$/.test(body.outcome) && /^(first|return)$/.test(body.visit);
+  if (body.survey_version !== undefined && body.survey_version !== "1" && body.survey_version !== "2") return false;
+  if (body.survey_version === "2") {
+    if (!body.feedback_id) return false;
+    if (body.event === "survey_reasons" &&
+      (typeof body.reason_revision !== "number" || body.reason_revision % 1 !== 0 || body.reason_revision < 1 || body.reason_revision > 1000000 ||
+      body.outcome !== "not_found" || !/^(first|return)$/.test(body.visit) ||
+      !/^(no_route|unreadable_schedule|hard_to_use|time_mismatch|other|skipped)$/.test(body.reasons))) return false;
+  }
+  if (body.event === "survey_answered") return (body.outcome === "in_progress" ? body.survey_version === "2" : /^(found|not_found)$/.test(body.outcome)) && /^(first|return)$/.test(body.visit);
   if (body.event === "survey_reasons") return typeof body.reasons === "string" && body.reasons.length <= 200 && /^[a-z_]+(,[a-z_]+)*$/.test(body.reasons);
   return false;
 }

@@ -41,9 +41,21 @@ npm run dev
 
 首頁／路線頁預設路線清單列的「錯過垃圾車？限時收受點」入口（`components/collection-entry-link.tsx`）送 `collection_entry_viewed`（連結至少 50% 進入可視區域時送出、每次掛載最多一次，點擊早於曝光回呼時會先補記曝光）與 `collection_entry_clicked`（每次點擊），都附帶 `source=route_list`。以點擊事件的不重複訪客數除以曝光事件的不重複訪客數得到點擊率。行政區頁、依地區瀏覽頁與搜尋結果列的其他入口連結不送事件；`/collection-points` 的頁面瀏覽數會另外包含搜尋引擎與直接進站的流量，不等於入口點擊數。
 
-路線頁的查詢體驗問卷（`components/survey-prompt.tsx`）在點過站點或換過站之後再停留 20 秒才以底部抽屜跳出，搜尋面板或站點詳情開著時延後；同一次瀏覽只問一次，回答或關掉後記在 `localStorage`，14 天內不再出現。事件：`survey_shown`（`trigger`：`stop_dwell`／`stop_nav`、`visit`：`first`／`return`）、`survey_answered`（`outcome`：`found`／`not_found`）、`survey_reasons`（`reasons` 以逗號相接，略過為 `skipped`）、`survey_form_opened`、`survey_form_declined`、`survey_dismissed`（`step`：`question`／`reasons`／`invite`），都附帶 `route_id`、`city`、`district`，不含位置或自由文字。`survey_shown → survey_answered` 看問法與時機，`survey_answered → survey_form_opened` 看 Tally 表單值不值得留；`outcome=not_found` 的比例與 `reasons` 分布本身就是產品回饋，不必等表單。
+路線頁的查詢體驗問卷（`components/survey-prompt.tsx`）在點過站點或換過站之後再停留 20 秒才以底部抽屜跳出，搜尋面板或站點詳情開著時延後；同一次瀏覽只問一次，回答或關掉後記在 `localStorage`，14 天內不再出現。新版 `survey_version=2` 的主題提供「有，找到了」（`found`）、「查了，但沒找到」（`not_found`）、「還在查／只是看看」（`in_progress`）。第三種回答直接讓使用者繼續查詢，不追問原因或邀填 Tally。沒找到時追問主要原因，單選點擊立即送出，毋須再按送出；可在下一步改選。原因為 `no_route`（找不到附近的路線或站點）、`unreadable_schedule`（看不懂時間或清運日）、`hard_to_use`（不知道怎麼操作）、`time_mismatch`（時間跟實際到站不同）、`other`（其他／不確定）；略過為 `skipped`。自由文字維持在選填 Tally 表單。
 
-`survey_answered` 與 `survey_reasons` 除了送 Vercel 事件，也會 POST 到 `app/api/survey/route.ts` 並轉送 Apps Script（`scripts/survey-sheet-webhook.gs`）。新回饋用每次詢問產生的隨機 `feedback_id` 合併到 `quick_answers` 同一列，原因先到或重送也不重複新增；沒有 ID 的舊版頁面仍逐筆保存。ID 只識別這次回饋，不識別使用者。欄位包含 `received_at`、`updated_at`、`outcome`、`reasons`、`route_id`、`city`、`district`、`visit`、`feedback_id`、`reason_status`。原因狀態分為 `answered`、`skipped`、`not_received`、`not_applicable`；未提供原因不可當成已回答。保留既有列與人工備註，不收集精確位置或自由文字。
+| 問卷 Vercel 事件 | 觸發時機／額外欄位 | 寫入 Sheet |
+| --- | --- | --- |
+| `survey_shown` | 問卷出現；`trigger=stop_dwell/stop_nav`、`visit=first/return` | 否 |
+| `survey_answered` | 首次主答案；`outcome=found/not_found/in_progress`、`visit` | 是 |
+| `survey_reasons` | 首次點選原因或略過；`reasons`、`outcome=not_found`、`reason_revision=1` | 是 |
+| `survey_reasons_changed` | 原因改選；`reasons`、`outcome=not_found`、遞增 `reason_revision` | 是，以 `survey_reasons` 更新同一列 |
+| `survey_form_opened` | 點擊開啟 Tally；`outcome`，不代表完成表單 | 否 |
+| `survey_form_declined` | 不填表單、完成或繼續查詢；`outcome` | 否 |
+| `survey_dismissed` | 關閉問卷；`step=question/reasons/invite` | 否 |
+
+所有問卷事件都附帶 `route_id`、`city`、`district`、`survey_version`，不含精確位置或自由文字。重選相同原因不重送；改選事件不可加進首次原因填答人數。Vercel 不附帶 `feedback_id`，不與 Sheet 逐筆配對。找到率計算為 `found / (found + not_found)`，`in_progress` 另外呈現；有效原因填答率以 Sheet 的最終答案計算：`outcome=not_found` 且 `reason_status=answered` 的筆數／`not_found` 筆數。新舊版本分開比較，舊版沒有 `survey_version`，原因曾允許多選。Vercel 事件次數包含重試與改選等操作，不直接當作使用者人數。
+
+`survey_answered` 與 `survey_reasons` 除了送 Vercel 事件，也會 POST 到 `app/api/survey/route.ts` 並轉送 Apps Script（`scripts/survey-sheet-webhook.gs`）。新回饋用每次詢問產生的隨機 `feedback_id` 合併到 `quick_answers` 同一列，原因先到或重送也不重複新增；新版原因請求同時包含主答案與 `visit`，即使第一個答案請求遺失也能保留完整情境。改選依 `reason_revision` 保留最新答案，較舊請求晚到不覆蓋。沒有 ID 的舊版頁面仍逐筆保存。ID 只識別這次回饋，不識別使用者。欄位包含 `received_at`、`updated_at`、`outcome`、`reasons`、`route_id`、`city`、`district`、`visit`、`feedback_id`、`reason_status`、`survey_version`、`reason_revision`。原因狀態分為 `answered`（有原因）、`skipped`（明確略過）、`not_received`（尚未收到，包含直接關閉或傳送失敗）、`not_applicable`（找到或還在查）；未提供原因不可當成已回答。舊版請求在新腳本記為版本 `1`，既有資料不回填、不自動配對。保留既有列與人工備註，不收集精確位置或自由文字。
 
 啟用步驟：
 1. 開啟目標 Google Sheet → 擴充功能 → Apps Script。用 `scripts/survey-sheet-webhook.gs` **取代整份預設程式**，不可包在 `myFunction()` 裡。
@@ -52,6 +64,8 @@ npm run dev
 4. 在網站伺服器環境設定 `SURVEY_SHEET_WEBHOOK_URL` 與 `SURVEY_SHEET_SECRET`；本機使用 `.env.local`，Vercel 正式環境設定後須重新部署。密鑰不可加 `NEXT_PUBLIC_`。
 5. 更新 Apps Script 後，管理部署 → 編輯 → 新版本，才會更新 `/exec`。
 6. 送一筆明確標記為測試的答案及原因，確認 Sheet 同一列出現兩者；重送不得新增列。舊資料保留。設定完成前不可宣稱已開始收件。
+
+**升級問卷 v2 的部署順序：先更新 Apps Script 部署到新版本，再部署網站。** 舊腳本不接受 `in_progress`，也不會處理改選序號；只部署網站會造成部分回答遺失。驗證三種主答案、略過、原因改選、同筆回饋合併與亂序請求後，再開始以版本 `2` 分析。
 
 目前前端另存為 fire-and-forget；缺少設定時 API 回 204，寫入失敗回 502，成功回 202。前端尚未等待確認或自動重試，因此畫面上的「已記下」不能當成 Google Sheet 寫入成功的證據。Tally 站點卡入口仍由 Tally 的整合設定收件，這條管道負責原頁詢問的回答。Google 官方部署說明：https://developers.google.com/apps-script/guides/web
 
