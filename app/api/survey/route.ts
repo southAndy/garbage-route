@@ -3,7 +3,7 @@ import { appendSurveyRecord, surveyRecordSchema, surveyStoreConfig } from "@/lib
 
 const MAX_BODY_BYTES = 2_048;
 
-/** Receives a one-tap survey answer from the route page and appends it to the Google Sheet. */
+/** Receives a one-tap survey answer from route and collection pages and appends it to the Google Sheet. */
 export async function POST(request: Request) {
   const config = surveyStoreConfig();
   if (!config) return new NextResponse(null, { status: 204 });

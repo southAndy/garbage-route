@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, expect, it, vi } from "vitest";
 import { parseCollectionPoints } from "./collection-points";
 import { loadCollectionPoints } from "./collection-point-loader";
@@ -31,4 +32,23 @@ it("成功讀取來源，非成功狀態不得當成正常資料", async () => {
   expect((await loadCollectionPoints()).points).toHaveLength(1);
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(csv, { status: 503 })));
   expect((await loadCollectionPoints()).failed).toBe(true);
+});
+
+// Official CSV downloaded 2026-11-01; source updated 2026-02-23.
+// https://data.taipei/dataset/detail?id=1acf38f3-1509-4cb1-898a-9b1d4f31a3af
+it.each(["text/csv", "text/csv; charset=big5", "text/csv; charset=utf-8"])("可讀取官方 Big5 CSV，不依賴 Content-Type 的編碼宣告 %s", async (contentType) => {
+  const bytes = new Uint8Array(readFileSync(new URL("./fixtures/taipei-collection-points.big5.csv", import.meta.url)));
+  // Response.text() always uses UTF-8, even if the response declares Big5.
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(bytes, {
+    headers: { "content-type": contentType },
+  })));
+  const result = await loadCollectionPoints();
+  expect(result.failed).toBe(false);
+  expect(result.points).toHaveLength(30);
+  expect(result.points[0]).toMatchObject({
+    district: "士林區", name: "蘭雅", address: "臺北市士林區文昌路211之3號",
+    notes: "周三、周日開放時間為06：00~16：00，其餘開放時間為06：00~22：00",
+    latitude: 25.09997, longitude: 121.52006,
+  });
+  expect(result.points.find((point) => point.name === "南京")?.notes).toContain("資源回收物(不含廚餘)");
 });

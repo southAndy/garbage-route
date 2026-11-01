@@ -2,14 +2,16 @@
 
 import { track } from "@vercel/analytics";
 import Link from "next/link";
+import { collectionPointsPath } from "@/lib/paths";
+import type { CityCode } from "@/lib/types";
 import { useEffect, useRef, type ComponentPropsWithoutRef } from "react";
 
 export type CollectionEntrySource = "route_list";
 
-type Props = Omit<ComponentPropsWithoutRef<typeof Link>, "href"> & { source: CollectionEntrySource };
+type Props = Omit<ComponentPropsWithoutRef<typeof Link>, "href"> & { source: CollectionEntrySource; city?: CityCode; district?: string };
 
 /** Link to the collection-points page that records its exposure and clicks so a click rate can be derived. */
-export default function CollectionEntryLink({ source, onClick, ...props }: Props) {
+export default function CollectionEntryLink({ source, city, district, onClick, ...props }: Props) {
   const linkRef = useRef<HTMLAnchorElement>(null);
   const viewed = useRef(false);
 
@@ -31,7 +33,7 @@ export default function CollectionEntryLink({ source, onClick, ...props }: Props
     try { track(event, { source }); } catch { /* Tracking is optional. */ }
   }
 
-  return <Link {...props} ref={linkRef} href="/collection-points" onClick={(event) => {
+  return <Link {...props} ref={linkRef} href={collectionPointsPath(city, district)} onClick={(event) => {
     // A click can arrive before the observer callback; keep the denominator complete.
     if (!viewed.current) {
       viewed.current = true;

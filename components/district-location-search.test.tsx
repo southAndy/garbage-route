@@ -17,8 +17,11 @@ it("在行政區頁提供定位，傳送約略座標並保留位置供路線地�
     resolved: { city: "TPE", district: "士林區", districtSlug: "shilin" }, radius: 500, expanded: false, routes: [],
   } }) });
   vi.stubGlobal("fetch", fetcher);
-  render(<DistrictLocationSearch city="TPE" districtSlug="shilin" />);
+  render(<DistrictLocationSearch city="TPE" districtSlug="shilin" districtName="士林區" />);
   expect(locate).not.toHaveBeenCalled();
+  const collectionUrl = new URL(screen.getByRole("link", { name: /找限時收受點/ }).getAttribute("href")!, "https://example.test");
+  expect(collectionUrl.searchParams.get("city")).toBe("TPE");
+  expect(collectionUrl.searchParams.get("district")).toBe("士林區");
   fireEvent.click(screen.getByRole("button", { name: /使用目前位置查附近路線/ }));
   await act(async () => { success({ coords: { latitude: 25.123456, longitude: 121.523456, accuracy: 30 } } as GeolocationPosition); });
   expect(fetcher).toHaveBeenCalledWith("/api/v1/nearby?lat=25.123&lng=121.523");
@@ -32,7 +35,7 @@ it("在行政區頁提供定位，傳送約略座標並保留位置供路線地�
 
 it("瀏覽器不支援定位時顯示提示", () => {
   vi.stubGlobal("navigator", { userAgent: "test" });
-  render(<DistrictLocationSearch city="TPE" districtSlug="shilin" />);
+  render(<DistrictLocationSearch city="TPE" districtSlug="shilin" districtName="士林區" />);
   fireEvent.click(screen.getByRole("button", { name: /使用目前位置查附近路線/ }));
   expect(screen.getByRole("status").textContent).toContain("此瀏覽器不支援定位");
 });
@@ -43,14 +46,14 @@ it("從大同區定位到永和時切換行政區，且不在大同區渲染永�
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: {
     resolved: { city: "NTP", district: "永和區", districtSlug: "yonghe" }, radius: 500, expanded: false, routes: [],
   } }) }));
-  const view = render(<DistrictLocationSearch city="TPE" districtSlug="datong" />);
+  const view = render(<DistrictLocationSearch city="TPE" districtSlug="datong" districtName="大同區" />);
   fireEvent.click(screen.getByRole("button", { name: /使用目前位置查附近路線/ }));
   await act(async () => { success({ coords: { latitude: 25.01, longitude: 121.51, accuracy: 30 } } as GeolocationPosition); });
   expect(push).toHaveBeenCalledWith("/routes/ntp/yonghe");
   expect(screen.queryByText(/位置約在新北市永和區/)).toBeNull();
-  view.rerender(<DistrictLocationSearch city="NTP" districtSlug="yonghe" />);
+  view.rerender(<DistrictLocationSearch city="NTP" districtSlug="yonghe" districtName="永和區" />);
   expect(screen.getByText(/位置約在新北市永和區/)).toBeTruthy();
-  view.rerender(<DistrictLocationSearch city="TPE" districtSlug="datong" />);
+  view.rerender(<DistrictLocationSearch city="TPE" districtSlug="datong" districtName="大同區" />);
   expect(screen.queryByText(/位置約在新北市永和區/)).toBeNull();
   expect(push).toHaveBeenCalledTimes(1);
 });

@@ -6,18 +6,23 @@ const source = readFileSync(new URL("../scripts/survey-sheet-webhook.gs", import
 const id = "00000000-0000-4000-8000-000000000001";
 const base = { secret: "test", feedback_id: id, route_id: "r", city: "NTP", district: "永和區" };
 function fixture() {
-  const rows: unknown[][] = [];
-  const range = (r: number, c: number, height = 1, width = 1) => ({
-    setValue(value: unknown) { rows[r - 1] ??= []; rows[r - 1][c - 1] = value; },
-    setValues(values: unknown[][]) { values.forEach((row, i) => row.forEach((value, j) => range(r + i, c + j).setValue(value))); },
-    getValues() { return Array.from({ length: height }, (_, i) => Array.from({ length: width }, (_, j) => rows[r + i - 1]?.[c + j - 1] ?? "")); },
-    createTextFinder(value: string) { return { matchEntireCell() { return this; }, findNext() {
-      const index = rows.findIndex((row, i) => i >= r - 1 && i < r - 1 + height && row[c - 1] === value);
-      return index < 0 ? null : { getRow: () => index + 1 };
-    } }; },
-  });
-  const sheet = { getRange: range, getLastRow: () => rows.length, getLastColumn: () => rows[0]?.length ?? 0, setFrozenRows: vi.fn() };
-  const spreadsheet = { getSheetByName: () => sheet, insertSheet: () => sheet };
+  function makeSheet(rows: unknown[][] = []) {
+    const range = (r: number, c: number, height = 1, width = 1) => ({
+      setValue(value: unknown) { rows[r - 1] ??= []; rows[r - 1][c - 1] = value; },
+      setValues(values: unknown[][]) { values.forEach((row, i) => row.forEach((value, j) => range(r + i, c + j).setValue(value))); },
+      getValues() { return Array.from({ length: height }, (_, i) => Array.from({ length: width }, (_, j) => rows[r + i - 1]?.[c + j - 1] ?? "")); },
+      createTextFinder(value: string) { return { matchEntireCell() { return this; }, findNext() {
+        const index = rows.findIndex((row, i) => i >= r - 1 && i < r - 1 + height && row[c - 1] === value);
+        return index < 0 ? null : { getRow: () => index + 1 };
+      } }; },
+    });
+    return { rows, getRange: range, getLastRow: () => rows.length, getLastColumn: () => rows[0]?.length ?? 0, setFrozenRows: vi.fn() };
+  }
+  const quick = makeSheet();
+  const sheets = new Map([["quick_answers", quick]]);
+  const spreadsheet = { getSheetByName: (name: string) => sheets.get(name), insertSheet: (name: string) => {
+    const sheet = makeSheet(); sheets.set(name, sheet); return sheet;
+  } };
   const context = {
     PropertiesService: { getScriptProperties: () => ({ getProperty: (key: string) => key === "SURVEY_SECRET" ? "test" : "sheet-id" }) },
     SpreadsheetApp: { openById: () => spreadsheet, flush: vi.fn() },
@@ -26,7 +31,9 @@ function fixture() {
     doPost: undefined as unknown as (e: unknown) => string,
   };
   runInNewContext(source, context);
-  return { rows, post: (data: object) => context.doPost({ postData: { contents: JSON.stringify(data) } }), record: () => Object.fromEntries(rows[0].map((key, i) => [key, rows[1][i]])) };
+  return { rows: quick.rows, sheets,
+    post: (data: object) => context.doPost({ postData: { contents: JSON.stringify(data) } }),
+    record: (name = "quick_answers") => { const rows = sheets.get(name)!.rows; return Object.fromEntries(rows[0].map((key, i) => [key, rows[1][i]])); } };
 }
 
 describe("Apps Script webhook", () => {
@@ -98,5 +105,41 @@ describe("Apps Script webhook", () => {
       { reasons: "no_route,hard_to_use" }, { reasons: "stop_location" }, { outcome: undefined }, { visit: undefined }, { feedback_id: undefined },
     ]) expect(f.post({ ...reason, ...invalid })).toBe("bad request");
     expect(f.rows).toHaveLength(0);
+  });
+});
+
+const collectionBase = { secret: "test", page_type: "collection_points", survey_version: "1", feedback_id: id,
+  city: "TPE", district: "松山區", point_id: "tpe-collection-25", view_mode: "map", trigger: "collection_map_dwell", visit: "first" };
+describe("collection survey webhook", () => {
+  it("同一試算表分開保存收受點與路線回答，不改動路線列", () => {
+    const f = fixture();
+    f.post({ ...base, event: "survey_answered", outcome: "found", visit: "first" });
+    expect(f.post({ ...collectionBase, event: "survey_answered", outcome: "in_progress" })).toBe("ok");
+    expect(f.rows).toHaveLength(2);
+    expect(f.sheets.get("collection_answers")!.rows).toHaveLength(2);
+    expect(f.record().route_id).toBe("r");
+    expect(f.record("collection_answers")).toMatchObject({ page_type: "collection_points", point_id: "tpe-collection-25", view_mode: "map", outcome: "in_progress", reason_status: "not_applicable" });
+  });
+  it("原因先到可保留主答案，重送／亂序保留最新原因與人工備註", () => {
+    const f = fixture();
+    const reason = { ...collectionBase, event: "survey_reasons", outcome: "not_found", reasons: "unsuitable_hours", reason_revision: 2 };
+    expect(f.post(reason)).toBe("ok");
+    const rows = f.sheets.get("collection_answers")!.rows;
+    rows[0].push("operator_note"); rows[1][rows[0].length - 1] = "keep me";
+    f.post({ ...reason, reasons: "no_points", reason_revision: 1 });
+    f.post(reason);
+    f.post({ ...collectionBase, event: "survey_answered", outcome: "not_found" });
+    expect(rows).toHaveLength(2);
+    expect(f.record("collection_answers")).toMatchObject({ reasons: "unsuitable_hours", reason_revision: 2, reason_status: "answered", operator_note: "keep me" });
+    expect(f.post({ ...reason, point_id: "other" })).toBe("conflict");
+  });
+  it("全市或空結果不需要站點 ID，拒絕未知原因與缺失回饋 ID", () => {
+    const f = fixture();
+    const answer = { ...collectionBase, district: "", point_id: undefined, trigger: "collection_empty_dwell", event: "survey_answered", outcome: "not_found" };
+    expect(f.post(answer)).toBe("ok");
+    expect(f.post({ ...answer, event: "survey_reasons", reasons: "skipped", reason_revision: 1 })).toBe("ok");
+    expect(f.record("collection_answers").reason_status).toBe("skipped");
+    expect(f.post({ ...answer, feedback_id: undefined })).toBe("bad request");
+    expect(f.post({ ...answer, event: "survey_reasons", reasons: "no_route", reason_revision: 2 })).toBe("bad request");
   });
 });

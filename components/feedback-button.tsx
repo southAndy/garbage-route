@@ -4,8 +4,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { feedbackUrls, type FeedbackContext } from "@/lib/feedback";
 
 export default function FeedbackButton({
-  context = { entry: "general" }, label = "意見回饋", summary, dialogTitle,
-}: { context?: FeedbackContext; label?: string; summary?: string; dialogTitle?: string }) {
+  context = { entry: "general" }, label = "意見回饋", summary, dialogTitle, onOpen,
+}: { context?: FeedbackContext; label?: string; summary?: string; dialogTitle?: string; onOpen?: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   const titleId = useId();
@@ -23,6 +23,7 @@ export default function FeedbackButton({
   if (!urls) return null;
   return <>
     <button className="feedback-button" type="button" onClick={() => {
+      onOpen?.();
       setActiveForm({ ...urls, summary });
       dialog.current?.showModal();
       closeButton.current?.focus({ preventScroll: true });

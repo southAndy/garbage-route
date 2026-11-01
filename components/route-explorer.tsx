@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { CityCode, GarbageRoute, GarbageStop, RouteSummary } from "@/lib/types";
 import { suspiciousStopIds, warningForStop } from "@/lib/route-display";
-import { CITY_NAMES, cityPath, districtPath, routePath } from "@/lib/paths";
+import { CITY_NAMES, cityPath, collectionPointsPath, districtPath, routePath } from "@/lib/paths";
 import SearchParamQuery from "./search-param-query";
 import StopOutcomeFeedback from "./stop-outcome-feedback";
 import StopScheduleTable from "./stop-schedule-table";
@@ -27,7 +27,7 @@ import CollectionEntryLink from "./collection-entry-link";
 import { closestUpcomingRouteId, partitionNearbyRoutes, partitionSearchResults, routeSpanLabel, routeSpanStatus, taipeiClock, type NearbySort } from "@/lib/stop-timing";
 import { dismissNearbyHint, hasSeenLocateExplainer, isNearbyHintDismissed, markLocateExplainerSeen } from "@/lib/search-hints";
 import { nextUpcomingStop, routeTodayStatus, scheduleRows, stopPillLabel, stopStatus, WEEKDAY_NAMES } from "@/lib/route-status";
-import { markVisited, requestSurveyPrompt, setSurveyBlocked, type SurveyTrigger } from "@/lib/survey-prompt";
+import { cancelSurveyPrompt, markVisited, requestSurveyPrompt, setSurveyBlocked, type SurveyTrigger } from "@/lib/survey-prompt";
 import { haversineMeters } from "@/lib/nearby-search";
 import { readNearbySort, writeNearbySort } from "@/lib/nearby-sort";
 import { readListScroll, saveListScroll } from "@/lib/list-scroll";
@@ -100,6 +100,10 @@ export default function RouteExplorer({
     if (!initialRoute) return null;
     return (initialFocus && initialRoute.stops.find((stop) => stop.id === initialFocus.stopId)) ?? initialRoute.stops[0] ?? null;
   });
+  useEffect(() => {
+    const routeId = route?.id;
+    return () => { if (routeId) cancelSurveyPrompt(routeId); };
+  }, [route?.id]);
   const [query, setQuery] = useState(initialQuery);
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
   const [loadingRoutes, setLoadingRoutes] = useState(Boolean(initialRoute || initialDistrict));
@@ -495,6 +499,9 @@ export default function RouteExplorer({
   const searchGroups = useMemo(() => !nearby && debouncedQuery.trim() ? partitionSearchResults(routes, clock) : null, [nearby, debouncedQuery, routes, clock]);
   const matchedQuery = routes[0]?.matches?.query ?? debouncedQuery.trim();
   // When ordering by time, flag the closest card so people who would rather wait can still spot it.
+  const collectionCity = route?.cityCode ?? nearby?.resolved?.city ?? city;
+  const collectionDistrict = route?.district ?? nearby?.resolved?.district ?? district;
+  const collectionHref = collectionPointsPath(collectionCity, collectionDistrict);
   const closestRouteId = nearbySort === "time" && nearbyGroups ? closestUpcomingRouteId(nearbyGroups.upcoming) : null;
   const validCount = useMemo(() => route?.stops.filter((stop) => stop.coordinateStatus === "valid").length ?? 0, [route]);
   const suspiciousIds = useMemo(() => suspiciousStopIds(route), [route]);
@@ -542,10 +549,10 @@ export default function RouteExplorer({
                 <button type="button" className="clear-nearby" onClick={clearNearby}>{referenceLabel ? "清除參考位置" : "清除定位"}</button>
               </> : awaitingLocation || !district ? <span>輸入關鍵字，再選擇符合的地點</span> : loadingRoutes ? <span>查詢中…</span> : searchGroups ? <>
                 <span><b>{routes.length}</b> 條路線經過「{matchedQuery}」{searchGroups.upcoming.length > 1 && "・依最快抵達"}</span>
-                <Link href="/collection-points">限時收受點 →</Link>
+                <Link href={collectionHref}>限時收受點 →</Link>
               </> : <>
                 <span>{district || CITY_NAMES[city]} {routes.length} 條路線・依名稱排序</span>
-                <CollectionEntryLink source="route_list">錯過垃圾車？限時收受點 →</CollectionEntryLink>
+                <CollectionEntryLink source="route_list" city={collectionCity} district={collectionDistrict}>錯過垃圾車？限時收受點 →</CollectionEntryLink>
               </>}
             </div>
           </div>
@@ -573,7 +580,7 @@ export default function RouteExplorer({
               {userPosition?.accuracy != null && userPosition.accuracy > ACCURACY_WARNING_METERS && <p className="nearby-accuracy-warning" role="status">定位誤差約 {formatDistance(userPosition.accuracy)}，附近結果僅供參考，建議改用路名搜尋確認。</p>}
               {nearby.routes.length === 0 || !nearbyGroups ? <div className="empty-state"><span>1 公里內沒有垃圾車站點</span><p>請改用路名或地址搜尋</p>{nearby.resolved && <FeedbackButton label="附近應該有站點？告訴我們" context={{ entry: "empty_nearby", city: nearby.resolved.city, district: nearby.resolved.district, radius: String(nearby.radius) }} summary={`${CITY_NAMES[nearby.resolved.city]}・${nearby.resolved.district}・附近 ${nearby.radius} 公尺無結果`} />}</div> : (
                 <div ref={listRef} className="route-list" onScroll={rememberScroll}>
-                  {nearbyGroups.upcoming.length === 0 && <p className="nearby-all-passed">附近路線今天的表定時間都已過，或今日不收。<Link href="/collection-points">找限時收受點 →</Link> 以下列表可供規劃其他日子。</p>}
+                  {nearbyGroups.upcoming.length === 0 && <p className="nearby-all-passed">附近路線今天的表定時間都已過，或今日不收。<Link href={collectionHref}>找限時收受點 →</Link> 以下列表可供規劃其他日子。</p>}
                   {nearbyGroups.upcoming.map(({ route: item, timing }) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card nearby-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => selectNearbyRoute(event, item)}>
                     <NearbyRouteCard item={item} referenceLabel={referenceLabel} clock={clock} timing={timing} closest={item.id === closestRouteId} />
                   </Link>)}
@@ -590,7 +597,7 @@ export default function RouteExplorer({
             {error && <div className="alert" role="alert">{error}</div>}
             {awaitingLocation || !district ? <div className="empty-state"><span>想找哪裡的垃圾車？</span><p>輸入路名、地址或站點，從下拉選單選擇地點。</p></div> : loadingRoutes ? <div className="routes-loading" role="status"><span className="spinner" aria-hidden="true" /><span>正在載入路線資料…</span></div> : routes.length === 0 ? !error && <div className="empty-state"><span>沒有相符路線</span><p>試試其他路名或地址</p>{district && <FeedbackButton label="找不到要找的地點？告訴我們" context={{ entry: "empty_search", city, district, query: debouncedQuery }} summary={`${CITY_NAMES[city]}・${district}${debouncedQuery ? `・搜尋：${debouncedQuery}` : ""}`} />}</div> : searchGroups ? (
               <div ref={listRef} className="route-list" onScroll={rememberScroll}>
-                {searchGroups.upcoming.length === 0 && <p className="nearby-all-passed">經過「{matchedQuery}」的路線今天表定時間都已過，或今日不收。<Link href="/collection-points">找限時收受點 →</Link> 以下列表可供規劃其他日子。</p>}
+                {searchGroups.upcoming.length === 0 && <p className="nearby-all-passed">經過「{matchedQuery}」的路線今天表定時間都已過，或今日不收。<Link href={collectionHref}>找限時收受點 →</Link> 以下列表可供規劃其他日子。</p>}
                 {searchGroups.upcoming.map(({ route: item, timing }, index) => <Link key={item.id} href={routePath(item)} prefetch={false} className={`route-card search-card ${route?.id === item.id ? "selected" : ""}`} aria-current={route?.id === item.id ? "page" : undefined} onClick={(event) => selectCardRoute(event, item, item.matches?.stops[Math.max(timing.nextIndex, 0)]?.stopId)}>
                   <SearchRouteCard item={item} query={debouncedQuery.trim()} clock={clock} timing={timing} fastest={index === 0 && searchGroups.upcoming.length > 1 && timing.minutesUntilNext !== null} />
                 </Link>)}
@@ -671,7 +678,7 @@ export default function RouteExplorer({
               {selectedStop.departureTime && <p className="detail-row">預定離開 <b>{displayTime(selectedStop, "departureTime")}</b></p>}
               {selectedStop.memo && <p className="memo">{selectedStop.memo}</p>}
               {selectedStopStatus === "passed" && routeStatus?.kind === "running" && routeStatus.stop && <p className="popup-note">已過表定時間不代表車已離開。<button type="button" onClick={() => chooseStop(routeStatus.stop!)}>跳到下一個即將到的站 {displayTime(routeStatus.stop)} {routeStatus.stop.name} →</button></p>}
-              {selectedStopStatus === "notToday" && <p className="popup-note">{routeStatus?.today ?? "今天不收"}{routeStatus?.detail ? `，${routeStatus.detail}` : "。"}<Link href="/collection-points">找限時收受點 →</Link></p>}
+              {selectedStopStatus === "notToday" && <p className="popup-note">{routeStatus?.today ?? "今天不收"}{routeStatus?.detail ? `，${routeStatus.detail}` : "。"}<Link href={collectionHref}>找限時收受點 →</Link></p>}
               {selectedStop.schedule && <div className="schedule day-schedule">
                 {scheduleRows(selectedStop).map((row) => <div key={row.label} className="day-schedule-row">
                   <span>{row.label}</span>

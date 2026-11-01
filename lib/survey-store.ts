@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { COLLECTION_SURVEY_REASONS } from "./collection-survey-options";
 import { SURVEY_REASONS } from "./survey-options";
 
 /** Durable survey storage. A per-prompt feedback_id merges answer/reason events;
@@ -8,9 +9,9 @@ const feedbackId = z.string().uuid().optional(); // Optional for already-open ol
 const reasonList = z.string().trim().min(1).max(200).regex(/^[a-z_]+(,[a-z_]+)*$/);
 const version = z.enum(["1", "2"]).optional();
 
-export const surveyRecordSchema = z.discriminatedUnion("event", [
-  z.object({ event: z.literal("survey_answered"), feedback_id: feedbackId, survey_version: version, outcome: z.enum(["found", "not_found", "in_progress"]), visit: z.enum(["first", "return"]), route_id: short, city: short, district: short }),
-  z.object({ event: z.literal("survey_reasons"), feedback_id: feedbackId, survey_version: version, reasons: reasonList, reason_revision: z.number().int().min(1).max(1_000_000).optional(), outcome: z.literal("not_found").optional(), visit: z.enum(["first", "return"]).optional(), route_id: short, city: short, district: short }),
+const routeSurveyRecordSchema = z.discriminatedUnion("event", [
+  z.object({ page_type: z.literal("route").optional(), event: z.literal("survey_answered"), feedback_id: feedbackId, survey_version: version, outcome: z.enum(["found", "not_found", "in_progress"]), visit: z.enum(["first", "return"]), route_id: short, city: short, district: short }),
+  z.object({ page_type: z.literal("route").optional(), event: z.literal("survey_reasons"), feedback_id: feedbackId, survey_version: version, reasons: reasonList, reason_revision: z.number().int().min(1).max(1_000_000).optional(), outcome: z.literal("not_found").optional(), visit: z.enum(["first", "return"]).optional(), route_id: short, city: short, district: short }),
 ]).superRefine((record, ctx) => {
   if (record.event === "survey_answered" && record.outcome === "in_progress" && record.survey_version !== "2") {
     ctx.addIssue({ code: "custom", message: "in_progress requires survey version 2" });
@@ -22,6 +23,21 @@ export const surveyRecordSchema = z.discriminatedUnion("event", [
     ctx.addIssue({ code: "custom", message: "version 2 requires a single reason and a complete revision snapshot" });
   }
 });
+const collectionContext = {
+  page_type: z.literal("collection_points"), survey_version: z.literal("1"),
+  feedback_id: z.string().uuid(), city: z.enum(["TPE", "NTP"]),
+  district: z.string().trim().max(64), point_id: short.optional(), view_mode: z.enum(["list", "map"]),
+  trigger: z.enum(["collection_list_dwell", "collection_map_dwell", "collection_empty_dwell"]),
+  visit: z.enum(["first", "return"]),
+};
+export const collectionSurveyRecordSchema = z.discriminatedUnion("event", [
+  z.object({ ...collectionContext, event: z.literal("survey_answered"), outcome: z.enum(["found", "not_found", "in_progress"]) }),
+  z.object({ ...collectionContext, event: z.literal("survey_reasons"), outcome: z.literal("not_found"),
+    reasons: z.enum([...COLLECTION_SURVEY_REASONS.map((reason) => reason.value), "skipped"]),
+    reason_revision: z.number().int().min(1).max(1_000_000) }),
+]);
+export const surveyRecordSchema = z.union([routeSurveyRecordSchema, collectionSurveyRecordSchema]);
+export type CollectionSurveyRecord = z.infer<typeof collectionSurveyRecordSchema>;
 export type SurveyRecord = z.infer<typeof surveyRecordSchema>;
 
 export function surveyStoreConfig(env: Record<string, string | undefined> = process.env) {

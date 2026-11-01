@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from "react";
 import { track } from "@vercel/analytics";
 import type { SurveyRecord } from "./survey-store";
+import { canShowSurvey, claimSurvey, completeSurvey, resetSurveyFrequencyForTests } from "./survey-frequency";
+export { SURVEY_SUPPRESS_DAYS } from "./survey-frequency";
 import { SURVEY_VERSION, type SurveyOutcome, type SurveyReason } from "./survey-options";
 export type { SurveyOutcome } from "./survey-options";
 
@@ -21,9 +23,6 @@ export interface SurveyRouteContext { route_id: string; city: string; district: 
 export interface SurveyPromptState { visible: boolean; trigger: SurveyTrigger | null; context: SurveyRouteContext | null; visit: SurveyVisit }
 
 export const SURVEY_DWELL_MS = 20_000;
-export const SURVEY_SUPPRESS_DAYS = 14;
-const DONE_KEY = "survey-prompt-done";
-const SESSION_KEY = "survey-prompt-shown";
 const VISITED_KEY = "visited-before";
 
 let state: SurveyPromptState = { visible: false, trigger: null, context: null, visit: "first" };
@@ -41,14 +40,6 @@ function patch(next: Partial<SurveyPromptState>) { state = { ...state, ...next }
 
 function readLocal(key: string) { try { return window.localStorage.getItem(key); } catch { return null; } }
 function writeLocal(key: string, value: string) { try { window.localStorage.setItem(key, value); } catch { /* Blocked storage: the session flag still holds. */ } }
-function sessionShown() { try { return window.sessionStorage.getItem(SESSION_KEY) === "1"; } catch { return false; } }
-function rememberSession() { try { window.sessionStorage.setItem(SESSION_KEY, "1"); } catch { /* ignore */ } }
-
-function suppressed(now = Date.now()) {
-  const done = Number(readLocal(DONE_KEY));
-  return Number.isFinite(done) && done > 0 && now - done < SURVEY_SUPPRESS_DAYS * 24 * 60 * 60 * 1000;
-}
-function markDone() { writeLocal(DONE_KEY, String(Date.now())); }
 
 function send(event: string, properties: Record<string, string>) {
   try { track(event, properties); } catch { /* Analytics never blocks the survey. */ }
@@ -72,17 +63,17 @@ export function markVisited(): SurveyVisit {
 
 function show() {
   pending = false;
+  if (!claimSurvey()) return;
   feedbackId = window.crypto.randomUUID();
   selectedReason = undefined;
   reasonRevision = 0;
-  rememberSession();
   patch({ visible: true });
   send("survey_shown", { trigger: state.trigger ?? "stop_dwell", ...contextProps(), visit: state.visit });
 }
 
 /** Start (or keep) the dwell timer after a meaningful interaction. The first trigger wins. */
 export function requestSurveyPrompt(trigger: SurveyTrigger, context: SurveyRouteContext) {
-  if (state.visible || pending || timer !== null || sessionShown() || suppressed()) return;
+  if (state.visible || pending || timer !== null || !canShowSurvey()) return;
   state = { ...state, trigger, context, visit: markVisited() };
   timer = window.setTimeout(() => {
     timer = null;
@@ -97,7 +88,7 @@ export function setSurveyBlocked(next: boolean) {
 }
 
 export function answerSurvey(outcome: SurveyOutcome) {
-  markDone();
+  completeSurvey();
   send("survey_answered", { outcome, ...contextProps(), visit: state.visit });
   if (state.context) store({ feedback_id: feedbackId, survey_version: SURVEY_VERSION, event: "survey_answered", outcome, visit: state.visit, ...state.context });
 }
@@ -130,7 +121,7 @@ export function dismissSurvey(step: SurveyStep) {
   if (timer !== null) { window.clearTimeout(timer); timer = null; }
   pending = false;
   if (!state.visible) return;
-  markDone();
+  completeSurvey();
   send("survey_dismissed", { step, ...contextProps() });
   patch({ visible: false });
 }
@@ -139,8 +130,17 @@ function subscribe(listener: () => void) { listeners.add(listener); return () =>
 const serverState: SurveyPromptState = { visible: false, trigger: null, context: null, visit: "first" };
 export function useSurveyPrompt() { return useSyncExternalStore(subscribe, () => state, () => serverState); }
 
+/** A route's pending prompt must not follow the user to another page. */
+export function cancelSurveyPrompt(routeId?: string) {
+  if (routeId && state.context?.route_id !== routeId) return;
+  if (timer !== null) { window.clearTimeout(timer); timer = null; }
+  pending = false;
+  if (state.visible || state.context) patch({ visible: false, context: null, trigger: null });
+}
+
 /** Test hook: back to a fresh page load. */
 export function resetSurveyPromptForTests() {
+  resetSurveyFrequencyForTests();
   if (timer !== null) { window.clearTimeout(timer); timer = null; }
   pending = false; blocked = false; visitKind = null; feedbackId = undefined;
   selectedReason = undefined; reasonRevision = 0;

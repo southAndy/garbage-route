@@ -1,6 +1,9 @@
 export type FeedbackContext = {
-  entry: "general" | "stop" | "empty_search" | "empty_nearby" | "stop_outcome";
-  outcome?: "found" | "not_found";
+  entry: "general" | "stop" | "empty_search" | "empty_nearby" | "stop_outcome" | "collection_points";
+  outcome?: "found" | "not_found" | "in_progress";
+  page_type?: "collection_points";
+  point_id?: string;
+  view_mode?: "list" | "map";
   city?: string;
   district?: string;
   route_id?: string;

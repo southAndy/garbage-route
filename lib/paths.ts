@@ -18,3 +18,11 @@ export function districtPath(city: CityCode, districtSlug: string) {
 export function routePath(route: Pick<GarbageRoute, "cityCode" | "districtSlug" | "id">) {
   return `${districtPath(route.cityCode, route.districtSlug)}/${route.id}`;
 }
+
+/** Keep the route's area when offering an alternative collection location. */
+export function collectionPointsPath(city?: CityCode, district = "") {
+  if (!city) return "/collection-points";
+  const params = new URLSearchParams({ city });
+  if (district) params.set("district", district);
+  return `/collection-points?${params}`;
+}

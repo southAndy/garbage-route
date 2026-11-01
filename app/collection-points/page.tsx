@@ -5,6 +5,7 @@ import SiteHeader from "@/components/site-header";
 import Breadcrumb from "@/components/breadcrumb";
 import CollectionPointFinder from "@/components/collection-point-finder";
 import { loadCollectionPoints } from "@/lib/collection-point-loader";
+import { getDistricts } from "@/lib/repository";
 import { socialMetadata } from "@/lib/social-metadata";
 
 const title = "錯過垃圾車？雙北限時收受點查詢";
@@ -25,7 +26,7 @@ export default async function CollectionPointsPage() {
       <p className="collection-eyebrow">錯過垃圾車，也有其他選擇</p>
       <h1>找限時收受點</h1>
       <p className="hub-lead">先確認收受時段與種類，再帶垃圾出門。限時收受點不是全天開放的垃圾場，部分地點是垃圾車限時駐點。</p>
-      <CollectionPointFinder points={points} failed={failed} />
+      <CollectionPointFinder points={points} failed={failed} districts={{ TPE: getDistricts("TPE").map((item) => item.name), NTP: getDistricts("NTP").map((item) => item.name) }} />
       <AdSlot slot="collection_points" />
     </div>
   </main>;

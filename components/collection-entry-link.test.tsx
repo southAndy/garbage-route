@@ -49,3 +49,11 @@ it("點擊早於曝光回呼時補記曝光，追蹤失敗不影響連結，卸�
   view.unmount();
   expect(disconnect).toHaveBeenCalled();
 });
+
+it("入口網址保留目前路線的城市與行政區", () => {
+  render(<CollectionEntryLink source="route_list" city="TPE" district="松山區">松山入口</CollectionEntryLink>);
+  const href = screen.getByRole("link", { name: "松山入口" }).getAttribute("href")!;
+  const url = new URL(href, "https://example.test");
+  expect(url.searchParams.get("city")).toBe("TPE");
+  expect(url.searchParams.get("district")).toBe("松山區");
+});

@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { feedbackUrls } from "@/lib/feedback";
-import { answerSurvey, declineSurveyForm, dismissSurvey, openSurveyForm, submitSurveyReasons, useSurveyPrompt, type SurveyOutcome, type SurveyStep } from "@/lib/survey-prompt";
+import { cancelSurveyPrompt, answerSurvey, declineSurveyForm, dismissSurvey, openSurveyForm, submitSurveyReasons, useSurveyPrompt, type SurveyOutcome, type SurveyStep } from "@/lib/survey-prompt";
 import { SURVEY_REASONS, type SurveyReason } from "@/lib/survey-options";
 
 /**
@@ -38,7 +38,11 @@ export default function SurveyPrompt() {
     if (visible) heading.current?.focus();
   }, [visible, step]);
 
-  if (pathname === "/") return null;
+  useEffect(() => {
+    if (!pathname.startsWith("/routes/")) cancelSurveyPrompt();
+  }, [pathname]);
+
+  if (!pathname.startsWith("/routes/")) return null;
   const formUrl = process.env.NEXT_PUBLIC_TALLY_FORM_URL;
 
   const choose = (next: SurveyOutcome) => {

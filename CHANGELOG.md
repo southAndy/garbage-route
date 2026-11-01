@@ -2,6 +2,14 @@
 
 ## 未發布
 
+- 限時收受點加入頁內問卷：列表／地圖可見閱讀 20 秒、空結果 8 秒後顯示；背景與回饋表單開啟時暫停，和路線頁共用單次及 14 天免打擾。
+- 收受點問卷支援未成功原因與改選，三種主答案皆可開啟既有 Tally 選填建議；快速回答以獨立事件與 `collection_answers` 分頁保存。須先更新 Apps Script 部署。
+
+- 限時收受點入口帶入目前路線／行政區的城市與地區，篩選同步網址；無資料時可擴大至全市。
+- 臺北收受點新增地圖與列表選點連動：桌機並列，手機切換列表／地圖，保留篩選與選取；地圖失敗保留列表與重試入口。
+
+- 修正臺北限時收受點官方 CSV 使用 Big5 編碼時載入失敗：改從原始位元組判讀 UTF-8／Big5，並加入真實官方檔案回歸測試。
+
 - 問卷的一鍵答案（`survey_answered`、`survey_reasons`）另存到 Tally 綁的 Google Sheet：新增 `POST /api/survey` 轉送到 Apps Script 網頁應用程式（`scripts/survey-sheet-webhook.gs`），寫進 `quick_answers` 分頁；由 `SURVEY_SHEET_WEBHOOK_URL`、`SURVEY_SHEET_SECRET` 啟用，未設定時不另存。
 - 新增 `vitest.config.ts` 讓測試也能解析 `@/` 路徑別名，API route 可直接測。
 - 新增 Vercel 事件 `collection_entry_viewed`／`collection_entry_clicked`（`source=route_list`），記錄首頁／路線頁預設清單列「錯過垃圾車？限時收受點」入口的曝光與點擊，可算點擊率。

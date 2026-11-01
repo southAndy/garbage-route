@@ -40,7 +40,7 @@ export default async function DistrictPage({ params }: DistrictPageProps) {
         <p className="eyebrow">{CITY_NAMES[city]}</p>
         <h1>{district.name}垃圾車路線</h1>
         <p className="hub-lead">共 {routes.length} 條表定路線。點選路線查看地圖與每一站的清運時間，或<Link href={`/?city=${city}&district=${encodeURIComponent(district.name)}`}>在地圖中搜尋停靠點</Link>。</p>
-        <DistrictLocationSearch city={city} districtSlug={district.slug} />
+        <DistrictLocationSearch city={city} districtSlug={district.slug} districtName={district.name} />
         <h2>{district.name}完整路線列表</h2>
         <ul className="hub-grid">
           {routes.map((route) => (

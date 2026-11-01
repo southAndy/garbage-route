@@ -86,3 +86,35 @@ describe("POST /api/survey", () => {
     } finally { vi.unstubAllEnvs(); vi.unstubAllGlobals(); error.mockRestore(); }
   });
 });
+
+describe("collection survey records", () => {
+  const collection = { page_type: "collection_points", survey_version: "1", feedback_id: "00000000-0000-4000-8000-000000000001",
+    event: "survey_answered", outcome: "in_progress", visit: "first", city: "TPE", district: "", view_mode: "list", trigger: "collection_list_dwell" };
+  it("收受點記錄獨立辨識，全市查詢不要求路線或站點 ID", () => {
+    expect(surveyRecordSchema.parse(collection)).toEqual(collection);
+    expect(surveyRecordSchema.parse({ ...collection, point_id: "tpe-collection-25", district: "松山區" })).toMatchObject({ point_id: "tpe-collection-25" });
+  });
+  it("嚴格檢查頁面、城市、檢視、原因與完整改選快照", () => {
+    const reason = { ...collection, event: "survey_reasons", outcome: "not_found", reasons: "unsuitable_hours", reason_revision: 1 };
+    expect(surveyRecordSchema.safeParse(reason).success).toBe(true);
+    for (const invalid of [{ reasons: "no_route" }, { reasons: "no_points,other" }, { reason_revision: undefined }, { visit: undefined }, { outcome: "found" },
+      { feedback_id: undefined }, { view_mode: "unknown" }, { city: "unknown" }, { trigger: "stop_dwell" }, { page_type: "unknown", route_id: "r" }]) {
+      expect(surveyRecordSchema.safeParse({ ...reason, ...invalid }).success).toBe(false);
+    }
+  });
+});
+
+it("收受點答案可透過既有 API 轉送，保留頁面與檢視情境", async () => {
+  vi.stubEnv("SURVEY_SHEET_WEBHOOK_URL", config.url);
+  vi.stubEnv("SURVEY_SHEET_SECRET", config.secret);
+  const fetchSpy = vi.fn(async () => new Response("ok", { status: 200 }));
+  vi.stubGlobal("fetch", fetchSpy);
+  const body = { page_type: "collection_points", survey_version: "1", feedback_id: "00000000-0000-4000-8000-000000000001", event: "survey_answered",
+    outcome: "found", visit: "first", city: "TPE", district: "松山區", point_id: "tpe-collection-25", view_mode: "map", trigger: "collection_map_dwell" };
+  try {
+    expect((await POST(new Request("https://example.test/api/survey", { method: "POST", body: JSON.stringify(body) }))).status).toBe(202);
+    const requestBody = JSON.parse(String((fetchSpy.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+    expect(requestBody).toEqual({ ...body, secret: config.secret });
+    expect(requestBody).not.toHaveProperty("route_id");
+  } finally { vi.unstubAllEnvs(); vi.unstubAllGlobals(); }
+});
