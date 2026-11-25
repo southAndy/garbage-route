@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: official-data-sync
@@ -49,17 +50,47 @@ jobs:
           SITE_URL: https://trash.andywalking.tw
           VERCEL_ENV: production
 
-      - name: Commit the validated snapshot and check time
+      # The default branch only accepts changes through a pull request, so the
+      # snapshot goes to a short-lived branch and is merged via its own PR.
+      - name: Publish the validated snapshot and check time through a pull request
         env:
+          GH_TOKEN: ${{ github.token }}
           PRODUCTION_BRANCH: ${{ github.event.repository.default_branch }}
+          SYNC_BRANCH: data-sync/${{ github.run_id }}-${{ github.run_attempt }}
+          COMMIT_TITLE: "chore(data): refresh official routes and check time"
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/routes.json data/manifest.json data/suspicious-coordinates.json
           if ! git diff --cached --quiet; then
-            git commit -m "chore(data): refresh official routes and check time"
-            # A concurrent branch update fails safely; rerun instead of overwriting it.
-            git push origin "HEAD:$PRODUCTION_BRANCH"
+            git switch -c "$SYNC_BRANCH"
+            git commit -m "$COMMIT_TITLE"
+            git push origin "$SYNC_BRANCH"
+            snapshot_sha=$(git rev-parse HEAD)
+            pr_number=$(gh api --method POST "repos/$GITHUB_REPOSITORY/pulls" \
+              -f base="$PRODUCTION_BRANCH" -f head="$SYNC_BRANCH" -f title="$COMMIT_TITLE" \
+              -f body="Validated by $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+              --jq '.number')
+            pr_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/pull/$pr_number"
+            echo "Data sync pull request: $pr_url" >> "$GITHUB_STEP_SUMMARY"
+
+            # GitHub computes mergeability asynchronously, so the first attempts can be refused.
+            # A conflicting concurrent update never merges; fix or close the PR, then rerun.
+            merged=false
+            for attempt in 1 2 3 4 5; do
+              if result=$(gh api --method PUT "repos/$GITHUB_REPOSITORY/pulls/$pr_number/merge" \
+                -f sha="$snapshot_sha" -f merge_method=merge --jq '.merged') && [ "$result" = true ]; then
+                merged=true
+                break
+              fi
+              if [ "$attempt" -lt 5 ]; then sleep 10; fi
+            done
+            if [ "$merged" != true ]; then
+              echo "::error::Could not confirm the snapshot was merged. Check $pr_url."
+              exit 1
+            fi
+            # The repository may already have deleted the branch after merge.
+            git push origin --delete "$SYNC_BRANCH" || echo "::notice::Check whether $SYNC_BRANCH still needs cleanup."
           fi
 
       - name: Trigger Vercel deployment
