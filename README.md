@@ -140,16 +140,17 @@ npm run sync:data
 
 `.github/workflows/sync-data.yml` 每週一 **台北時間 05:23（週日 UTC 21:23）** 排程執行，也支援 GitHub Actions 的 **Run workflow** 手動執行。GitHub 排程可能延遲，並非準點保證。官方資料異動會在下次成功同步後反映；需要提前更新時可手動執行。
 
-流程：下載兩市資料 → 品質檢查 → 測試與 lint → 正式建置 → 提交資料與檢查時間 → 呼叫 Vercel Deploy Hook。任一步驟失敗都會停止，下載或品質檢查失敗不會提交資料或觸發部署。來源內容沒變時仍會部署，讓網站顯示最新的成功檢查時間；sitemap 的路線 `lastModified` 仍使用資料同步時間。
+流程：下載兩市資料 → 品質檢查 → 測試與 lint → 正式建置 → 將資料與檢查時間提交到 `data-sync/*` 暫時分支，開 PR 並合併回預設分支 → 呼叫 Vercel Deploy Hook。任一步驟失敗都會停止，下載或品質檢查失敗不會提交資料或觸發部署。來源內容沒變時仍會部署，讓網站顯示最新的成功檢查時間；sitemap 的路線 `lastModified` 仍使用資料同步時間。
 
 啟用一次即可：
 
 1. 在 Vercel 專案 **Settings → Git → Deploy Hooks** 建立 `weekly-data-sync`，選擇正式分支 `main`。既有的 `daily-data-sync` Hook 可繼續使用，名稱不影響排程，不需重建。
 2. 在 GitHub repository **Settings → Secrets and variables → Actions → New repository secret** 新增 `VERCEL_DEPLOY_HOOK`，值為剛產生的完整 Hook URL。不要把 URL 寫進程式碼或公開日誌。
-3. 將 workflow 與程式碼推送至 repository 預設分支（目前為 `main`）。Vercel 正式分支與 Hook 分支必須和它一致；分支規則須允許此工作流程提交 `data/` 更新。
-4. 到 **Actions → Sync official garbage routes → Run workflow** 執行一次，確認所有步驟成功，再到 Vercel 確認部署為 Ready，抽查路線頁的「最後成功檢查」。Hook 請求成功只代表部署已受理，不代表建置已完成。
+3. 在 GitHub repository **Settings → Actions → General → Workflow permissions** 勾選 **Allow GitHub Actions to create and approve pull requests**。預設分支規則要求變更必須經由 PR，工作流程因此以 PR 合併 `data/` 更新；未勾選時開 PR 的步驟會失敗。
+4. 將 workflow 與程式碼合併至 repository 預設分支（目前為 `main`），並確認 Vercel 正式分支與 Hook 都指向該分支。工作流程以 merge commit 合併已驗證的資料版本。若分支規則仍要求審核或檢查，請從執行摘要的 PR 連結查看尚待滿足的條件。GitHub 確認合併後，工作流程才會呼叫部署 Hook。
+5. 到 **Actions → Sync official garbage routes → Run workflow** 執行一次，確認所有步驟成功，再到 Vercel 確認部署為 Ready，抽查路線頁的「最後成功檢查」。Hook 請求成功只代表部署已受理，不代表建置已完成。
 
-未設定 secret 時，工作流程會在修改資料前明確失敗。若同步期間有人推送新提交，資料 push 會安全失敗而不覆蓋遠端；重新執行即可。若 Hook 或部署失敗，修正後重新執行 workflow。Git 整合也可能因資料提交觸發部署，請以 Vercel 最新的 Ready 部署為準。
+未設定 secret 時，工作流程會在修改資料前明確失敗。若同步期間預設分支有新提交，沒有衝突時 PR 仍會正常合併；有衝突時合併會失敗而不覆蓋遠端，關閉殘留的 `data-sync/*` PR 後重新執行即可。若 Hook 或部署失敗，修正後重新執行 workflow。Git 整合也可能因資料提交觸發部署，請以 Vercel 最新的 Ready 部署為準。
 
 GitHub 公開 repository 長期沒有活動時可能停用排程；請定期確認 Actions 紀錄及失敗通知。排程／建置不會自動讀取本機 `.env`；若要改用其他官方來源 URL，可在 workflow 的同步步驟設定對應環境變數。
 
